@@ -68,3 +68,32 @@ def test_dry_run_writes_nothing(tmp_path, monkeypatch):
     results = rebuild_covers.rebuild(dry_run=True)
     assert results
     assert not os.path.exists(out / '_pre_cover_backup')
+
+
+def test_a_failing_verify_does_not_stop_later_skus(tmp_path, monkeypatch):
+    # One bad product must not hide the other twenty. _verify raising used to
+    # propagate straight out of rebuild(), aborting the whole batch.
+    import build_etsy_kit as kit
+
+    out = tmp_path / 'outputs'
+    out.mkdir()
+    monkeypatch.setattr(rebuild_covers, 'OUT', str(out))
+    monkeypatch.setattr(rebuild_covers, 'BACKUP_DIR', str(out / '_pre_cover_backup'))
+
+    bad, good = kit.SKUS[0], kit.SKUS[1]
+    for s in (bad, good):
+        p = out / s['pdf']
+        doc = fitz.open()
+        doc.new_page(width=612, height=792)
+        doc.save(str(p))
+        doc.close()
+
+    def fake_verify(path):
+        if bad['pdf'] in path:
+            raise AssertionError('simulated verify failure')
+
+    monkeypatch.setattr(rebuild_covers, '_verify', fake_verify)
+
+    results = dict(rebuild_covers.rebuild(sku_filter=[bad['sku'], good['sku']]))
+    assert results[bad['sku']].startswith('FAILED')
+    assert results[good['sku']] == 'ok'

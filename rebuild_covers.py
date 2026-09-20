@@ -93,9 +93,13 @@ def rebuild(sku_filter=None, dry_run=False):
         if dry_run:
             results.append((name, 'would rebuild %s' % pdf_name))
             continue
-        backup_once(pdf_name)
-        splice(path, pdfpage.cover_pdf_bytes(specs[name]))
-        _verify(path)
+        try:
+            backup_once(pdf_name)
+            splice(path, pdfpage.cover_pdf_bytes(specs[name]))
+            _verify(path)
+        except AssertionError as e:
+            results.append((name, 'FAILED: %s' % e))
+            continue
         results.append((name, 'ok'))
     return results
 

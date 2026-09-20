@@ -91,6 +91,13 @@ def description_for(s: dict) -> str:
 
 # ------------------------------------------------------------------- guards
 
+# The 5 mockups build_etsy_kit.py generates per SKU, in listing-image rank order.
+# 01/02/03 are the Etsy gallery order; 04_pin and 05_wide are also uploaded (Pinterest,
+# and the landscape render gumroadpub.etsy_cover_urls relies on) but do not change rank.
+IMAGE_NAMES = ('01_main.png', '02_inside.png', '03_included.png',
+              '04_pin.png', '05_wide.png')
+
+
 def check(s: dict) -> list[str]:
     """Everything Etsy will reject, caught before we spend a call finding out.
 
@@ -119,10 +126,10 @@ def check(s: dict) -> list[str]:
             problems.append('missing deliverable: %s' % f)
     if not os.path.exists(os.path.join(config.OUT, s['pdf'])):
         problems.append('missing mockup source PDF: %s' % s['pdf'])
-    for name in ('01_main', '02_inside', '03_included'):
-        p = os.path.join(config.ETSY_ASSETS, s['sku'], name + '.png')
+    for name in IMAGE_NAMES:
+        p = os.path.join(config.ETSY_ASSETS, s['sku'], name)
         if not os.path.exists(p):
-            problems.append('missing mockup: %s/%s.png (run build_etsy_kit.py)'
+            problems.append('missing mockup: %s/%s (run build_etsy_kit.py)'
                             % (s['sku'], name))
     return problems
 
@@ -162,11 +169,11 @@ def build_draft(e: Etsy, s: dict) -> dict:
 
     row = db.get(s['sku'])
     if not row['images_done']:
-        for rank, name in enumerate(('01_main', '02_inside', '03_included'), start=1):
-            path = os.path.join(config.ETSY_ASSETS, s['sku'], name + '.png')
+        for rank, name in enumerate(IMAGE_NAMES, start=1):
+            path = os.path.join(config.ETSY_ASSETS, s['sku'], name)
             e.upload_image(listing_id, path, rank=rank,
                            alt_text='%s — page %d preview' % (s['title'][:120], rank))
-            print('  image %d/3 uploaded' % rank)
+            print('  image %d/%d uploaded' % (rank, len(IMAGE_NAMES)))
         db.update(s['sku'], images_done=1)
 
     row = db.get(s['sku'])
@@ -295,10 +302,6 @@ def update_file(e: Etsy, s: dict) -> str:
     return 'uploaded new PDF, removed %d old file(s)' % removed
 
 
-IMAGE_NAMES = ('01_main.png', '02_inside.png', '03_included.png',
-              '04_pin.png', '05_wide.png')
-
-
 def live_skus() -> list[dict]:
     """SKU records for every row the local db has an Etsy listing id for.
 
@@ -336,6 +339,15 @@ def live_named_skus(names: list[str]) -> list[dict]:
     return [by_name[n] for n in names]
 
 
+def _select_live(a: argparse.Namespace) -> list[dict]:
+    """The SKU selection shared by --update-images and --update-files: every live
+    listing by default, narrowed to --skus when given."""
+    if a.skus:
+        names = [x.strip() for x in a.skus.split(',')]
+        return live_named_skus(names)
+    return live_skus()
+
+
 def update_images(e: Etsy, s: dict) -> str:
     """Replace all 5 listing images on an existing listing with the current mockups.
 
@@ -370,13 +382,16 @@ def update_images(e: Etsy, s: dict) -> str:
     return 'uploaded 5 images, removed %d old one(s)' % removed
 
 
-def run_update_images(skus: list[dict], *, dry_run: bool = False,
-                      limit: int | None = None) -> dict:
-    """Drive update_images() over a selection already narrowed by main().
+def run_over_live(skus: list[dict], action, verb: str, *, dry_run: bool = False,
+                  limit: int | None = None) -> dict:
+    """Shared driver for both --update-images and --update-files.
 
-    Split out from main() so --dry-run is testable without argv/Etsy() plumbing:
-    dry-run must make no network calls at all, and this never constructs Etsy() unless
-    it is actually about to talk to the API.
+    `action(e, s)` is the per-SKU call (update_images or update_file); `verb` names what
+    it does ('images' / 'files') for the preview and tally lines.
+
+    Split out from main() so --dry-run is testable without argv/Etsy() plumbing: dry-run
+    must make no network calls at all, and this never constructs Etsy() unless it is
+    actually about to talk to the API.
     """
     if limit:
         skus = skus[:limit]
@@ -384,7 +399,7 @@ def run_update_images(skus: list[dict], *, dry_run: bool = False,
     if dry_run:
         print('\nDRY RUN — nothing sent to Etsy.\n')
         for s in skus:
-            print('  %-28s -> would update images' % s['sku'])
+            print('  %-28s -> would update %s' % (s['sku'], verb))
         return {'ready': [s['sku'] for s in skus]}
 
     e = Etsy()
@@ -392,7 +407,7 @@ def run_update_images(skus: list[dict], *, dry_run: bool = False,
     for i, s in enumerate(skus):
         print('\n%s' % s['sku'])
         try:
-            print('  ' + update_images(e, s))
+            print('  ' + action(e, s))
             done.append(s['sku'])
         except Exception as exc:                          # noqa: BLE001 - per listing
             failed.append(s['sku'])
@@ -400,8 +415,20 @@ def run_update_images(skus: list[dict], *, dry_run: bool = False,
         if i < len(skus) - 1:
             time.sleep(random.uniform(config.JITTER_MIN, config.JITTER_MAX))
 
-    print('\nimages updated: %d ok, %d failed' % (len(done), len(failed)))
+    print('\n%s updated: %d ok, %d failed' % (verb, len(done), len(failed)))
     return {'done': done, 'failed': failed}
+
+
+def run_update_images(skus: list[dict], *, dry_run: bool = False,
+                      limit: int | None = None) -> dict:
+    """Drive update_images() over a selection already narrowed by main()."""
+    return run_over_live(skus, update_images, 'images', dry_run=dry_run, limit=limit)
+
+
+def run_update_files(skus: list[dict], *, dry_run: bool = False,
+                     limit: int | None = None) -> dict:
+    """Drive update_file() over a selection already narrowed by main()."""
+    return run_over_live(skus, update_file, 'files', dry_run=dry_run, limit=limit)
 
 
 def preflight() -> bool:
@@ -522,33 +549,12 @@ def main() -> None:
 
     if a.update_images:
         db.init_db()
-        if a.skus:
-            names = [x.strip() for x in a.skus.split(',')]
-            skus = live_named_skus(names)
-        else:
-            skus = live_skus()
-        run_update_images(skus, dry_run=a.dry_run, limit=a.limit)
+        run_update_images(_select_live(a), dry_run=a.dry_run, limit=a.limit)
         return
 
     if a.update_files:
         db.init_db()
-        volumes = [int(v) for v in a.volumes.split(',') if v.strip()]
-        skus = volume_skus(volumes)
-        if a.limit:
-            skus = skus[:a.limit]
-        e = Etsy()
-        done, failed = [], []
-        for i, s in enumerate(skus):
-            print('\nvol %s — %s' % (s['volume'], s['sku']))
-            try:
-                print('  ' + update_file(e, s))
-                done.append(s['sku'])
-            except Exception as exc:                      # noqa: BLE001 - per listing
-                failed.append(s['sku'])
-                print('  FAILED: %s' % exc)
-            if i < len(skus) - 1:
-                time.sleep(random.uniform(config.JITTER_MIN, config.JITTER_MAX))
-        print('\nfiles updated: %d ok, %d failed' % (len(done), len(failed)))
+        run_update_files(_select_live(a), dry_run=a.dry_run, limit=a.limit)
         return
 
     if a.preflight:

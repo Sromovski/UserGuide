@@ -61,7 +61,9 @@ def test_every_live_sku_renders():
 def test_no_sku_renders_its_badge_off_canvas():
     # Pillow silently clips a paste box past the canvas edge, so a badge that
     # runs off the right side is invisible to a size assertion. 10 of 21 SKUs
-    # did exactly that before the clamp. Assert the badge pixels stay inside.
+    # did exactly that before the clamp. Collect every offender — asserting
+    # inside the loop would report only the first and hide the rest.
+    offenders = []
     for name, spec in catalogue.all_specs().items():
         img = render.render(spec, 'square').convert('RGB')
         pal = spec.palette
@@ -69,7 +71,9 @@ def test_no_sku_renders_its_badge_off_canvas():
         px = img.load()
         # the badge is the only element painted in badge_bg; scan the right edge
         edge_hits = [y for y in range(h) if px[w - 2, y] == pal.badge_bg]
-        assert not edge_hits, '%s paints badge colour on the right edge' % name
+        if edge_hits:
+            offenders.append('%s paints badge colour on the right edge' % name)
+    assert offenders == [], '\n'.join(offenders)
 
 
 def test_rotation_matches_the_css_direction():

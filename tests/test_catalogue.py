@@ -44,10 +44,14 @@ def test_badge_uses_the_volume_number_when_present():
 
 def test_badge_never_repeats_the_subtitle():
     # The badge used to fall back to badges[0], which is always the subtitle's
-    # first segment — the same words printed twice on 15 of 21 covers.
-    for name, spec in catalogue.all_specs().items():
-        if spec.badge:
-            assert spec.badge not in spec.subtitle, name
+    # first segment. Collect every offender — asserting inside the loop would
+    # report only the first and hide the rest.
+    clashes = [
+        '%s: badge %r appears in subtitle %r' % (name, spec.badge, spec.subtitle)
+        for name, spec in catalogue.all_specs().items()
+        if spec.badge and spec.badge in spec.subtitle
+    ]
+    assert clashes == [], '\n'.join(clashes)
 
 
 def test_prompt_vault_has_no_badge():
@@ -71,8 +75,13 @@ def test_every_sku_declares_spines():
 
 def test_spine_labels_are_short_enough_to_read_on_a_spine():
     # Check each spine's own lines. Joining the spines first would invent lines
-    # that span two labels and fail on correct data.
-    for s in kit.SKUS:
-        for spine in s['spines']:
-            for line in spine.split('\n'):
-                assert len(line) <= 18, (s['sku'], line)
+    # that span two labels and fail on correct data. Collect every offender —
+    # asserting inside the loop would report only the first and hide the rest.
+    offenders = [
+        (s['sku'], line)
+        for s in kit.SKUS
+        for spine in s['spines']
+        for line in spine.split('\n')
+        if len(line) > 18
+    ]
+    assert offenders == []

@@ -7,6 +7,8 @@ import os
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+from covers import palette
+
 FONT_DIR = r'C:\Windows\Fonts'
 BOLD = ['seguibl.ttf', 'arialbd.ttf', 'segoeuib.ttf']
 REG = ['segoeui.ttf', 'arial.ttf']
@@ -61,7 +63,7 @@ def gradient(size, stops):
     return small.resize((w, h), Image.BICUBIC)
 
 
-def _spine(size, colour, label, pal):
+def _spine(size, colour, label, pal, text_w=None, align='left'):
     """One book spine, unrotated, with its dark left edge and white rule."""
     w, h = size
     img = Image.new('RGBA', (w, h), colour + (255,))
@@ -71,22 +73,31 @@ def _spine(size, colour, label, pal):
         t = x / float(edge)
         d.line([(x, 0), (x, h)], fill=(0, 0, 0, int(115 * (1 - t))))
     pad = int(w * 0.10)
-    fnt = fit_text(max(label.split('\n'), key=len), w - pad * 2,
-                   max(9, int(w * 0.105)))
+    if text_w is None:
+        text_w = w - pad * 2
+    fnt = fit_text(max(label.split('\n'), key=len), text_w,
+                   max(9, int(w * 0.068)))
     y = int(h * 0.13)
+    bar_w = int(w * 0.34)
     for line in label.split('\n'):
-        d.text((pad, y), line, font=fnt, fill=(255, 255, 255, 255))
+        x = pad if align == 'left' else w - pad - _width(line, fnt)
+        d.text((x, y), line, font=fnt, fill=(255, 255, 255, 255))
         y += int(fnt.size * 1.25)
-    d.rectangle([pad, y + int(h * 0.02), pad + int(w * 0.34),
+    bar_x = pad if align == 'left' else w - pad - bar_w
+    d.rectangle([bar_x, y + int(h * 0.02), bar_x + bar_w,
                  y + int(h * 0.02) + max(2, int(h * 0.007))],
                 fill=(255, 255, 255, 140))
     return img
 
 
-def _paste_rotated(base, img, centre, angle, pal, shadow=True):
-    rot = img.rotate(angle, expand=True, resample=Image.BICUBIC)
+def _paste_rotated(base, img, centre, angle, pal, shadow=True, clamp=False):
+    rot = img.rotate(-angle, expand=True, resample=Image.BICUBIC)
     x = int(centre[0] - rot.width / 2)
     y = int(centre[1] - rot.height / 2)
+    if clamp:
+        m = int(base.width * 0.02)
+        x = max(m, min(x, base.width - rot.width - m))
+        y = max(m, min(y, base.height - rot.height - m))
     if shadow:
         sh = Image.new('RGBA', rot.size, (0, 0, 0, 0))
         sh.paste(pal.shadow + (120,), (0, 0), rot)
@@ -108,7 +119,7 @@ def _badge(base, text, centre, pal, scale):
                         fill=pal.badge_bg + (255,))
     d.text((padx, pady - fnt.getbbox(text)[1]), text, font=fnt,
            fill=pal.badge_fg + (255,))
-    _paste_rotated(base, chip, centre, ROT_BADGE, pal, shadow=False)
+    _paste_rotated(base, chip, centre, ROT_BADGE, pal, shadow=False, clamp=True)
 
 
 def _centred(d, text, fnt, cx, y, fill):
@@ -127,10 +138,12 @@ def _stack(base, spec, box, pal):
         return
     back, front, right = spec.spines
     sw, sh = int(bw * 0.40), int(bh * 0.82)
-    _paste_rotated(base, _spine((sw, sh), pal.spine_back_left, back, pal),
+    _paste_rotated(base, _spine((sw, sh), pal.spine_back_left, back, pal,
+                                text_w=int(sw * 0.55)),
                    (x0 + bw * 0.27, y0 + bh * 0.51), ROT_BACK_LEFT, pal)
     _paste_rotated(base, _spine((int(bw * 0.42), int(bh * 0.86)),
-                                pal.spine_back_right, right, pal),
+                                pal.spine_back_right, right, pal,
+                                text_w=int(bw * 0.42 * 0.55), align='right'),
                    (x0 + bw * 0.73, y0 + bh * 0.51), ROT_BACK_RIGHT, pal)
     _paste_rotated(base, _spine((sw, sh), pal.spine_front, front, pal),
                    (x0 + bw * 0.50, y0 + bh * 0.46), ROT_FRONT, pal)

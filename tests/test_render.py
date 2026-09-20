@@ -56,3 +56,32 @@ def test_single_kind_renders_without_error():
 def test_every_live_sku_renders():
     for name, s in catalogue.all_specs().items():
         assert render.render(s, 'square').size == (2000, 2000), name
+
+
+def test_no_sku_renders_its_badge_off_canvas():
+    # Pillow silently clips a paste box past the canvas edge, so a badge that
+    # runs off the right side is invisible to a size assertion. 10 of 21 SKUs
+    # did exactly that before the clamp. Assert the badge pixels stay inside.
+    for name, spec in catalogue.all_specs().items():
+        img = render.render(spec, 'square').convert('RGB')
+        pal = spec.palette
+        w, h = img.size
+        px = img.load()
+        # the badge is the only element painted in badge_bg; scan the right edge
+        edge_hits = [y for y in range(h) if px[w - 2, y] == pal.badge_bg]
+        assert not edge_hits, '%s paints badge colour on the right edge' % name
+
+
+def test_rotation_matches_the_css_direction():
+    # CSS rotate(+N) is clockwise; PIL rotate(+N) is counter-clockwise. The
+    # constants come from the CSS, so the renderer must negate on the way in.
+    # A tall red bar rotated CLOCKWISE puts its top edge to the RIGHT of centre.
+    from PIL import Image
+    bar = Image.new('RGBA', (40, 400), (255, 0, 0, 255))
+    base = Image.new('RGBA', (600, 600), (0, 0, 0, 0))
+    render._paste_rotated(base, bar, (300, 300), 30, render.palette.get('claude'),
+                          shadow=False)
+    px = base.load()
+    top_xs = [x for x in range(600) if px[x, 180][3] > 0]
+    assert top_xs, 'nothing drawn'
+    assert sum(top_xs) / len(top_xs) > 300, 'rotation is mirrored vs the CSS'

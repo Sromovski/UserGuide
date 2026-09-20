@@ -458,6 +458,41 @@ SKUS = [
                   'Unofficial. Not affiliated with OpenAI.'],
     ),
     dict(
+        sku='40-chatgpt-v1',
+        pdf='ChatGPT_Field_Guide_Volume_1_Getting_Started.pdf',
+        headline='ChatGPT\nfor Beginners',
+        sub='What replaced Custom GPTs.',
+        badges=['5 CHAPTERS', '27 PAGES', 'PLAIN ENGLISH'],
+        cover_badge='VOL 1',
+        spines=['Projects &\nMemory', 'Getting Into\nChatGPT', 'Plugins &\nApps'],
+        price='$9.99',
+        etsy_fit='HIGH — beginner AI guides sell well to Etsy\'s non-technical audience',
+        title='ChatGPT Field Guide for Beginners | Custom GPT Retirement Prompting Memory and Plugins | 27 Page AI Guide 2026',
+        tags=['chatgpt guide', 'ai for beginners', 'prompt engineering', 'custom gpt',
+              'chatgpt tutorial', 'ai prompts', 'digital download', 'beginner ai guide',
+              'chatgpt tips', 'ai productivity', 'openai guide', 'plain english',
+              'tech guide pdf'],
+        blurb='OpenAI is retiring Custom GPTs — migration opens 17 Sep 2026, new GPT '
+              'creation ends 25 Sep 2026, and existing ones stop running 11 Dec 2026. '
+              'Most ChatGPT guides still teach building one. This volume covers what '
+              'replaces them, plus everything a plain-English beginner guide should.',
+        bullets=[
+            'The Custom GPT retirement dates — migration opens 17 Sep, new GPTs end 25 '
+            'Sep, existing ones stop running 11 Dec 2026',
+            'What a 2026 Plugin actually is, and why it is not the 2023 plugins beta '
+            'OpenAI shut down in 2024',
+            'Custom instructions vs Memory vs Projects — three separate settings, easy '
+            'to mix up, explained clearly',
+            'A four-part prompt formula and copy-paste templates for people who have '
+            'never written one',
+            'Voice mode, image generation and file uploads, walked through step by step',
+            'Choosing a plan, from Free to Pro, printed in one table so a price change '
+            'is a single edit',
+        ],
+        included=['Volume 1 — Getting Started (27 pages)',
+                  'Unofficial. Not affiliated with OpenAI.'],
+    ),
+    dict(
         # FREE lead magnet. Gumroad-only — Etsy has no free listing tier. Its whole job
         # is to send people to the shop, so the CTA carries the shop URL.
         sku='12-start-here',

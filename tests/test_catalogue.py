@@ -10,7 +10,7 @@ def by_sku(name):
 
 def test_every_live_sku_produces_a_valid_spec():
     specs = catalogue.all_specs()
-    assert len(specs) == len(kit.SKUS) == 21, (
+    assert len(specs) == len(kit.SKUS) == 22, (
         'SKU count changed -- register the new SKU\'s palette (explicit '
         '"palette" key or a covering prefix in catalogue.PREFIX_PALETTE) '
         'before bumping this number')

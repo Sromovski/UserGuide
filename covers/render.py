@@ -134,22 +134,33 @@ def _stack(base, spec, box, pal):
     x0, y0, x1, y1 = box
     bw, bh = x1 - x0, y1 - y0
     if spec.kind == 'single':
-        sw, sh = int(bw * 0.36), int(bh * 0.88)
+        # Book aspect is fixed; constrain by both box dimensions so the
+        # spine does not stretch when the box isn't the square layout's
+        # aspect (see the bundle branch below for the same fix).
+        sw = min(int(bh * 0.88 * 0.69), int(bw * 0.5))
+        sh = int(sw / 0.69)
         img = _spine((sw, sh), pal.spine_front, spec.spines[0], pal)
         _paste_rotated(base, img, (x0 + bw * 0.50, y0 + bh * 0.50),
                        ROT_SINGLE, pal)
         return
     back, front, right = spec.spines
-    sw, sh = int(bw * 0.40), int(bh * 0.82)
+    BOOK_RATIO = 0.825          # width / height, from the approved square layout
+    SPREAD = 0.575              # centre offset of each back book, in book widths
+    # A book is limited either by the box height or by the width three of them
+    # need side by side (2*SPREAD + 1.05 == 2.2 book widths).
+    sw = min(int(bh * 0.82 * BOOK_RATIO), int(bw / 2.2))
+    sh = int(sw / BOOK_RATIO)
+    rw, rh = int(sw * 1.05), int(sh * 1.05)
+    cx = x0 + bw / 2.0
+    cy = y0 + bh * 0.51
     _paste_rotated(base, _spine((sw, sh), pal.spine_back_left, back, pal,
                                 text_w=int(sw * 0.55)),
-                   (x0 + bw * 0.27, y0 + bh * 0.51), ROT_BACK_LEFT, pal)
-    _paste_rotated(base, _spine((int(bw * 0.42), int(bh * 0.86)),
-                                pal.spine_back_right, right, pal,
-                                text_w=int(bw * 0.42 * 0.55), align='right'),
-                   (x0 + bw * 0.73, y0 + bh * 0.51), ROT_BACK_RIGHT, pal)
+                   (cx - SPREAD * sw, cy), ROT_BACK_LEFT, pal)
+    _paste_rotated(base, _spine((rw, rh), pal.spine_back_right, right, pal,
+                                text_w=int(rw * 0.55), align='right'),
+                   (cx + SPREAD * sw, cy), ROT_BACK_RIGHT, pal)
     _paste_rotated(base, _spine((sw, sh), pal.spine_front, front, pal),
-                   (x0 + bw * 0.50, y0 + bh * 0.46), ROT_FRONT, pal)
+                   (cx, y0 + bh * 0.46), ROT_FRONT, pal)
 
 
 def _render_portrait(spec, size):
@@ -191,7 +202,8 @@ def _render_wide(spec, size):
     base = gradient(size, pal.grad).convert('RGBA')
     d = ImageDraw.Draw(base)
     pad = int(w * 0.06)
-    col = int(w * 0.46)
+    sx0 = w - pad - int(h * 0.80)
+    col = sx0 - pad - int(w * 0.03)
 
     y = int(h * 0.26)
     tf = fit_text(max(spec.title_lines, key=len), col, int(h * 0.145))
@@ -202,7 +214,6 @@ def _render_wide(spec, size):
     sf = fit_text(spec.subtitle, col, int(h * 0.040))
     d.text((pad, y), spec.subtitle, font=sf, fill=pal.muted + (255,))
 
-    sx0 = w - pad - int(h * 0.80)
     _stack(base, spec, (sx0, int(h * 0.10), w - pad, int(h * 0.90)), pal)
     return base.convert('RGB')
 

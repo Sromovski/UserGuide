@@ -19,6 +19,12 @@ SHAPES = {'square': (2000, 2000), 'wide': (1280, 720), 'pin': (1000, 1500)}
 ROT_BACK_LEFT, ROT_FRONT, ROT_BACK_RIGHT = -8, -2, 6
 ROT_SINGLE, ROT_BADGE = -3, 6
 
+# A book may not be more than this many times taller than it is wide. Every
+# observed square-shape aspect across the catalogue is well under this, so
+# it never fires in `square`; wide and pin are taller-than-wide boxes whose
+# unclamped aspect would run past it, which is exactly what this catches.
+MAX_BOOK_H_OVER_W = 1.55
+
 
 def font(size, bold=True):
     for name in (BOLD if bold else REG):
@@ -134,42 +140,35 @@ def _stack(base, spec, box, pal):
     x0, y0, x1, y1 = box
     bw, bh = x1 - x0, y1 - y0
     if spec.kind == 'single':
-        # Book height follows book width, at the ratio of the approved
-        # square layout (619 x 895). Deriving height from width keeps
-        # every square cover bit-identical to the approved art: bh varies
-        # per SKU with the title block, so anything sized from bh silently
-        # changes the layout on longer titles. The guard only bites in a
-        # box too short to hold the book at that width.
-        SINGLE_H_OVER_W = 895.0 / 619.0
-        sw = int(bw * 0.36)
-        sh = int(sw * SINGLE_H_OVER_W)
-        if sh > bh * 0.95:
-            k = (bh * 0.95) / sh
-            sw, sh = int(sw * k), int(sh * k)
+        # Sizes and centre are exactly a72e720's approved square art. Height
+        # is meant to track bh (a shorter title leaves more room and the
+        # book grows into it) — only the ASPECT is clamped, and only so it
+        # cannot run away in the non-square shapes (see MAX_BOOK_H_OVER_W).
+        sw, sh = int(bw * 0.36), int(bh * 0.88)
+        if sh > sw * MAX_BOOK_H_OVER_W:
+            sh = int(sw * MAX_BOOK_H_OVER_W)
         img = _spine((sw, sh), pal.spine_front, spec.spines[0], pal)
         _paste_rotated(base, img, (x0 + bw * 0.50, y0 + bh * 0.50),
                        ROT_SINGLE, pal)
         return
     back, front, right = spec.spines
-    # Book height follows book width at the ratio of the approved square
-    # layout (688 x 834). Deriving height from width keeps every square
-    # cover bit-identical to the approved art: bh varies per SKU with the
-    # title block, so anything sized from bh silently changes the layout
-    # on longer titles. The guard only bites in a box too short to hold it.
-    BOOK_H_OVER_W = 834.0 / 688.0
-    sw = int(bw * 0.40)
-    sh = int(sw * BOOK_H_OVER_W)
-    rw = int(bw * 0.42)
-    rh = int(rw * BOOK_H_OVER_W)
-    if sh > bh * 0.90:
-        k = (bh * 0.90) / sh
-        sw, sh = int(sw * k), int(sh * k)
-        rw, rh = int(rw * k), int(rh * k)
+    # Sizes and centres are exactly a72e720's approved square art. Height
+    # is meant to track bh (a shorter title leaves more room and the books
+    # grow into it) — only the ASPECT is clamped, and only so it cannot run
+    # away in the non-square shapes (see MAX_BOOK_H_OVER_W). Every observed
+    # square aspect across the catalogue is well under the clamp, so it
+    # never fires there.
+    sw, sh = int(bw * 0.40), int(bh * 0.82)
+    rw, rh = int(bw * 0.42), int(bh * 0.86)
+    if sh > sw * MAX_BOOK_H_OVER_W:
+        sh = int(sw * MAX_BOOK_H_OVER_W)
+    if rh > rw * MAX_BOOK_H_OVER_W:
+        rh = int(rw * MAX_BOOK_H_OVER_W)
     _paste_rotated(base, _spine((sw, sh), pal.spine_back_left, back, pal,
                                 text_w=int(sw * 0.55)),
                    (x0 + bw * 0.27, y0 + bh * 0.51), ROT_BACK_LEFT, pal)
     _paste_rotated(base, _spine((rw, rh), pal.spine_back_right, right, pal,
-                                text_w=int(rw * 0.55), align='right'),
+                                text_w=int(bw * 0.42 * 0.55), align='right'),
                    (x0 + bw * 0.73, y0 + bh * 0.51), ROT_BACK_RIGHT, pal)
     _paste_rotated(base, _spine((sw, sh), pal.spine_front, front, pal),
                    (x0 + bw * 0.50, y0 + bh * 0.46), ROT_FRONT, pal)

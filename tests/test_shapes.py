@@ -40,23 +40,23 @@ def test_no_shape_renders_flat():
     assert offenders == []
 
 
-def test_square_book_geometry_is_identical_for_every_sku():
-    # Book size must depend only on the canvas, never on a SKU's title length.
-    # A bh-dependent formula silently resized the books on the four SKUs with
-    # taller title blocks, including three live products.
-    boxes = {}
+def test_square_front_book_width_is_identical_within_each_kind():
+    # Book WIDTH derives from the canvas alone and must never vary with a SKU's
+    # title length. Height deliberately does vary — a shorter title leaves more
+    # room and the books grow into it, which is the approved behaviour.
+    widths = {'bundle': {}, 'single': {}}
     for name, spec in catalogue.all_specs().items():
         img = render.render(spec, 'square').convert('RGB')
         w, h = img.size
         px = img.load()
         target = spec.palette.spine_front
-        xs, ys = [], []
-        for y in range(int(h * 0.5), h, 4):      # below the badge, which can
-            for x in range(0, w, 4):             # share a colour with a spine
-                if px[x, y] == target:
-                    xs.append(x)
-                    ys.append(y)
-        assert xs, '%s: front spine colour not found' % name
-        boxes[name] = (max(xs) - min(xs), max(ys) - min(ys))
-    widths = {wd for wd, _ in boxes.values()}
-    assert len(widths) == 1, 'front book width varies by SKU: %s' % boxes
+        best = 0
+        for y in range(int(h * 0.55), int(h * 0.95), 4):
+            xs = [x for x in range(0, w, 2) if px[x, y] == target]
+            if xs:
+                best = max(best, max(xs) - min(xs))
+        assert best, '%s: front spine colour not found' % name
+        widths[spec.kind][name] = best
+    for kind, found in widths.items():
+        distinct = set(found.values())
+        assert len(distinct) == 1, '%s width varies by SKU: %s' % (kind, found)

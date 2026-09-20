@@ -42,6 +42,18 @@ def test_badge_uses_the_volume_number_when_present():
     assert catalogue.spec_for(by_sku('02-starter-volume')).badge == 'VOL 1'
 
 
+def test_badge_never_repeats_the_subtitle():
+    # The badge used to fall back to badges[0], which is always the subtitle's
+    # first segment — the same words printed twice on 15 of 21 covers.
+    for name, spec in catalogue.all_specs().items():
+        if spec.badge:
+            assert spec.badge not in spec.subtitle, name
+
+
+def test_prompt_vault_has_no_badge():
+    assert catalogue.all_specs()['01-prompt-vault'].badge == ''
+
+
 def test_start_here_footer_says_free():
     assert catalogue.spec_for(by_sku('12-start-here')).footer == 'FREE DOWNLOAD'
 

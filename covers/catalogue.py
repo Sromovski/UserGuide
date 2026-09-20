@@ -30,7 +30,7 @@ def _badge(sku):
         return sku['cover_badge']
     if sku.get('volume'):
         return 'VOL %d' % sku['volume']
-    return sku['badges'][0]
+    return ''
 
 
 def spec_for(sku):

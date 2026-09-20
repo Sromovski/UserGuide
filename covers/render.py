@@ -107,7 +107,7 @@ def _paste_rotated(base, img, centre, angle, pal, shadow=True, clamp=False):
     base.alpha_composite(rot, (x, y))
 
 
-def _badge(base, text, centre, pal, scale):
+def _badge(base, text, right_x, top_y, pal, scale):
     fnt = font(max(9, int(scale * 0.030)), True)
     tw = _width(text, fnt)
     th = fnt.getbbox(text)[3]
@@ -119,7 +119,10 @@ def _badge(base, text, centre, pal, scale):
                         fill=pal.badge_bg + (255,))
     d.text((padx, pady - fnt.getbbox(text)[1]), text, font=fnt,
            fill=pal.badge_fg + (255,))
-    _paste_rotated(base, chip, centre, ROT_BADGE, pal, shadow=False, clamp=True)
+    rot = chip.rotate(-ROT_BADGE, expand=True, resample=Image.BICUBIC)
+    cx = right_x - rot.width / 2
+    cy = top_y + rot.height / 2 + int(scale * 0.012)
+    _paste_rotated(base, chip, (cx, cy), ROT_BADGE, pal, shadow=False, clamp=True)
 
 
 def _centred(d, text, fnt, cx, y, fill):
@@ -131,7 +134,7 @@ def _stack(base, spec, box, pal):
     x0, y0, x1, y1 = box
     bw, bh = x1 - x0, y1 - y0
     if spec.kind == 'single':
-        sw, sh = int(bw * 0.46), int(bh * 0.88)
+        sw, sh = int(bw * 0.36), int(bh * 0.88)
         img = _spine((sw, sh), pal.spine_front, spec.spines[0], pal)
         _paste_rotated(base, img, (x0 + bw * 0.50, y0 + bh * 0.50),
                        ROT_SINGLE, pal)
@@ -172,8 +175,8 @@ def _render_portrait(spec, size):
     foot_f = font(int(w * 0.019), True)
     foot_y = h - pad - foot_f.size
     _stack(base, spec, (pad, y, w - pad, foot_y - int(h * 0.035)), pal)
-    _badge(base, spec.badge, (w - pad - int(w * 0.035), y + int(h * 0.01)),
-           pal, w)
+    if spec.badge:
+        _badge(base, spec.badge, w - pad, y, pal, w)
 
     spaced = '  '.join(spec.footer)
     ff = fit_text(spaced, inner, int(w * 0.019))

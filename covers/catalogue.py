@@ -9,16 +9,28 @@ from covers.spec import CoverSpec
 SINGLE_SKUS = {'01-prompt-vault', '05-config-pack',
                '11-cost-calculator', '12-start-here'}
 
+# Maps a `pdf` filename prefix to its series palette. An explicit `palette`
+# key on the SKU always wins. Otherwise the filename must match one of these
+# prefixes -- there is no silent default. Adding a new series (ChatGPT, Grok,
+# ...) means adding its prefix here; a SKU whose file does not start with any
+# known prefix needs an explicit `palette` key instead (see 11-cost-calculator
+# in build_etsy_kit.py).
+PREFIX_PALETTE = {
+    'Claude_': 'claude', 'Copilot_': 'copilot', 'Codex_': 'codex',
+    'ChatGPT_': 'gpt', 'Grok_': 'grok',
+}
+
 
 def palette_for(sku):
     if sku.get('palette'):
         return sku['palette']
     pdf = sku.get('pdf', '')
-    if pdf.startswith('Copilot_'):
-        return 'copilot'
-    if pdf.startswith('Codex_'):
-        return 'codex'
-    return 'claude'
+    for prefix, key in PREFIX_PALETTE.items():
+        if pdf.startswith(prefix):
+            return key
+    raise KeyError('cannot resolve a palette for %r -- filename matches none '
+                   'of the known prefixes (%s) and the SKU has no explicit '
+                   '"palette" key' % (pdf, ', '.join(sorted(PREFIX_PALETTE))))
 
 
 def kind_for(sku):

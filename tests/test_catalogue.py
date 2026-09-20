@@ -10,7 +10,10 @@ def by_sku(name):
 
 def test_every_live_sku_produces_a_valid_spec():
     specs = catalogue.all_specs()
-    assert len(specs) == len(kit.SKUS) == 21
+    assert len(specs) == len(kit.SKUS) == 21, (
+        'SKU count changed -- register the new SKU\'s palette (explicit '
+        '"palette" key or a covering prefix in catalogue.PREFIX_PALETTE) '
+        'before bumping this number')
 
 
 def test_palette_follows_the_pdf_prefix():
@@ -21,6 +24,25 @@ def test_palette_follows_the_pdf_prefix():
 
 def test_explicit_palette_key_wins():
     assert catalogue.palette_for({'pdf': 'Anything.pdf', 'palette': 'grok'}) == 'grok'
+
+
+def test_every_live_sku_resolves_a_palette():
+    # Data-driven prefix map, not a hardcoded if/elif chain -- collect every
+    # offender rather than asserting inside the loop.
+    offenders = []
+    for s in kit.SKUS:
+        try:
+            catalogue.palette_for(s)
+        except KeyError as e:
+            offenders.append('%s: %s' % (s['sku'], e))
+    assert offenders == [], '\n'.join(offenders)
+
+
+def test_unknown_prefix_raises_instead_of_defaulting_to_claude():
+    # A ChatGPT_ or Grok_-prefixed SKU used to fall through silently to the
+    # Claude palette. Fail closed instead.
+    with pytest.raises(KeyError, match='Mystery_Product.pdf'):
+        catalogue.palette_for({'pdf': 'Mystery_Product.pdf'})
 
 
 def test_the_four_single_products_are_single_kind():

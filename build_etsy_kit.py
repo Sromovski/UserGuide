@@ -512,6 +512,10 @@ SKUS = [
         sku='11-cost-calculator',
         # `pdf` is the mockup source; `files` is what the buyer actually downloads.
         pdf='AI_Cost_Calculator_Preview.pdf',
+        # pdf's filename carries no vendor prefix (it's generic "AI_..."), so
+        # PREFIX_PALETTE can't resolve it -- this is a Claude-pricing product
+        # (see title/tags/blurb below), so it's pinned explicitly.
+        palette='claude',
         files=['AI_Cost_Calculator.xlsx'],
         headline='AI Cost\nCalculator',
         sub='Know the bill before it arrives.',

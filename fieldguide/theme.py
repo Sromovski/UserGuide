@@ -40,9 +40,21 @@ class Theme:
     code_bg: str = '#0A0A15'
     white: str = '#FFFFFF'
 
+    series_title: str = ''  # display override — see series_display
+
     def c(self, key: str):
         """Colour by attribute name, as a reportlab colour."""
         return HexColor(getattr(self, key))
+
+    @property
+    def series_display(self):
+        """The series name as shown to a reader.
+
+        Derived with .title() when a theme does not state one, which is correct
+        for Claude, Copilot and Codex but mangles any name with an internal
+        capital — 'CHATGPT ...'.title() gives 'Chatgpt'.
+        """
+        return self.series_title or self.series.title()
 
 
 CLAUDE = Theme(
@@ -96,6 +108,9 @@ GPT = Theme(
     accent_light='#D9A3FF',
     accent_dark='#7A2EBF',
     accent_darker='#5C1F94',
+    # .title() mangles the internal capital in 'CHATGPT' to 'Chatgpt' —
+    # state the correct display form explicitly instead.
+    series_title='ChatGPT Field Guide Series',
 )
 
 THEMES = {t.name: t for t in (CLAUDE, COPILOT, CODEX, GPT)}

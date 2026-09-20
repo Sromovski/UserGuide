@@ -41,7 +41,7 @@ class Volume:
         self.edition = edition
         self.c = canvas.Canvas(path, pagesize=LETTER)
         self.c.setTitle(title)
-        self.c.setAuthor(theme.series.title())
+        self.c.setAuthor(theme.series_display)
         self.c.setSubject(subtitle)
         self.p = Painter(self.c, theme)
         self.page_no = 0
@@ -57,7 +57,7 @@ class Volume:
         return self.p, CONTENT_TOP
 
     def close(self):
-        self.p.footer('%s  ·  %s' % (self.t.series.title(), self._label), self.page_no)
+        self.p.footer('%s  ·  %s' % (self.t.series_display, self._label), self.page_no)
         self.c.showPage()
 
     def save(self):

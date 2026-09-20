@@ -53,12 +53,12 @@ PALETTES = {
         shadow=(15, 60, 48)),
     'gpt': Palette(
         key='gpt',
-        grad=((240, 250, 246), (221, 243, 234), (194, 233, 216)),
-        title=(12, 31, 24), muted=(74, 117, 102),
-        spine_back_left=(24, 73, 58), spine_front=(16, 163, 127),
-        spine_back_right=(10, 23, 18),
-        badge_bg=(12, 31, 24), badge_fg=(255, 255, 255),
-        shadow=(12, 70, 52)),
+        grad=((250, 247, 255), (240, 233, 252), (224, 210, 246)),
+        title=(26, 18, 40), muted=(110, 92, 140),
+        spine_back_left=(45, 32, 66), spine_front=(180, 92, 255),
+        spine_back_right=(28, 18, 44),
+        badge_bg=(26, 18, 40), badge_fg=(255, 255, 255),
+        shadow=(60, 30, 90)),
     'grok': Palette(
         key='grok',
         grad=((244, 245, 247), (228, 231, 236), (203, 210, 218)),

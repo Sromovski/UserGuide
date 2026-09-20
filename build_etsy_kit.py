@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
 """Build the Etsy listing kit: mockup images + listing copy.
 
-Mockups composite REAL rendered pages from the product PDFs (via PyMuPDF) onto a
-warm cream background, so the previews show what buyers actually get. Cream rather
-than white so the tile has definition against Etsy's white search grid — the dark
-PDF pages then carry the contrast.
+Five images per SKU, from two different sources. 01_main, 03_included, 04_pin
+and 05_wide are GENERATED — drawn from the SKU's CoverSpec/copy by
+covers.render (the direction C cover art, at three aspects) or straight
+PIL drawing (the bullets/included-files panel); none of them touch the
+product PDF's own pixels. 02_inside is COMPOSITED — it pastes REAL rendered
+pages from the product PDF (via PyMuPDF) onto a warm cream background, so
+that one image shows exactly what buyers get. Cream rather than white so the
+tile has definition against Etsy's white search grid.
 
 Run:  python build_etsy_kit.py
-Outputs to outputs/etsy/:
-    <sku>/01_main.png  02_inside.png  03_included.png     (2000x2000)
+Outputs to outputs/etsy/<sku>/:
+    01_main.png      2000x2000  generated   — Etsy/storefront main image
+    02_inside.png    2000x2000  composited  — real pages from the product PDF
+    03_included.png  2000x2000  generated   — bullets + files-included panel
+    04_pin.png       1000x1500  generated   — Pinterest pin
+    05_wide.png      1280x720   generated   — Gumroad storefront tile
     LISTINGS.md   — titles, 13 tags, descriptions, pricing for every SKU
 """
 import os
@@ -819,8 +827,11 @@ def listing_md():
          '- Type: **Digital** — "Instant download". No shipping profile needed.',
          '- Category: Paper & Party Supplies > Paper > Stationery, or Craft Supplies & Tools > '
          'Digital > Templates. Pick one and keep it consistent.',
-         '- Upload the mockups from `outputs/etsy/<sku>/` in order: `01_main`, `02_inside`, '
-         '`03_included`. The first image is 80% of whether anyone clicks.',
+         '- Upload the mockups from `outputs/etsy/<sku>/` to the Etsy listing in order: '
+         '`01_main`, `02_inside`, `03_included`. The first image is 80% of whether anyone '
+         'clicks. `04_pin` (1000x1500) is sized for Pinterest, not Etsy — pin it separately '
+         'if you cross-post. `05_wide` (1280x720) is the Gumroad storefront tile; it belongs '
+         'on that product\'s Gumroad page, not on Etsy.',
          '- Renewal: Etsy gives new listings a short visibility boost. Stagger your listings '
          'across a few days rather than posting them all at once.',
          '', '---', '']

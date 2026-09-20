@@ -710,32 +710,29 @@ def badge_row(d, badges, cx, y, fnt):
         x += w + gap
 
 
-def img_main(s, pdf_path):
-    im = Image.new('RGB', (S, S), CREAM)
-    d = ImageDraw.Draw(im)
+def _cover_render(s, shape):
+    """Render this SKU's cover. Imported lazily: covers.catalogue imports this
+    module, and a module-level import here would make that a cycle."""
+    from covers import catalogue, render
+    return render.render(catalogue.spec_for(s), shape)
 
-    d.rectangle([0, 0, S, 26], fill=OGC)
 
-    f_head = font(150)
-    f_sub = font(62, bold=False)
-    y = 130
-    for line in s['headline'].split('\n'):
-        d.text((S // 2, y), line, font=f_head, fill=INK, anchor='ma')
-        y += 158
-    d.text((S // 2, y + 14), s['sub'], font=f_sub, fill=DOGC, anchor='ma')
+def img_main(s, pdf_path=None):
+    """The Etsy main image — direction C, generated not composited.
 
-    badge_row(d, s['badges'], S // 2, y + 130, font(38))
+    pdf_path is accepted and ignored; kept so existing callers still work.
+    """
+    return _cover_render(s, 'square')
 
-    cover = render_page(pdf_path, 0, 880)
-    max_h = S - (y + 250) - 190
-    if cover.height > max_h:
-        cover = cover.resize((int(cover.width * max_h / cover.height), max_h), Image.LANCZOS)
-    paste_shadowed(im, cover, ((S - cover.width) // 2, y + 250))
 
-    d.rectangle([0, S - 130, S, S], fill=INK)
-    d.text((S // 2, S - 65), 'INSTANT DIGITAL DOWNLOAD   ·   PDF   ·   2026 EDITION',
-           font=font(44), fill=CREAM, anchor='mm')
-    return im
+def img_pin(s):
+    """1000x1500 for Pinterest."""
+    return _cover_render(s, 'pin')
+
+
+def img_wide(s):
+    """1280x720 for the Gumroad storefront grid, which is landscape."""
+    return _cover_render(s, 'wide')
 
 
 def img_inside(s, pdf_path):
@@ -884,11 +881,13 @@ def main():
         os.makedirs(folder, exist_ok=True)
         for name, im in (('01_main', img_main(s, pdf)),
                          ('02_inside', img_inside(s, pdf)),
-                         ('03_included', img_included(s))):
+                         ('03_included', img_included(s)),
+                         ('04_pin', img_pin(s)),
+                         ('05_wide', img_wide(s))):
             p = os.path.join(folder, name + '.png')
             im.save(p, 'PNG', optimize=True)
             made += 1
-        print('%-24s 3 images  %s' % (s['sku'], s['price']))
+        print('%-24s 5 images  %s' % (s['sku'], s['price']))
 
     md = os.path.join(ETSY, 'LISTINGS.md')
     with open(md, 'w', encoding='utf-8') as f:

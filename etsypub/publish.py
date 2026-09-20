@@ -295,6 +295,59 @@ def update_file(e: Etsy, s: dict) -> str:
     return 'uploaded new PDF, removed %d old file(s)' % removed
 
 
+IMAGE_NAMES = ('01_main.png', '02_inside.png', '03_included.png',
+              '04_pin.png', '05_wide.png')
+
+
+def live_skus() -> list[dict]:
+    """SKU records for every row the local db has an Etsy listing id for.
+
+    Unlike `volume_skus`, this covers every live product, not just the 6 volumes —
+    images were re-rendered for all 21 live SKUs, not only the volumes. Mapped back to
+    build_etsy_kit.SKUS so listing copy (e.g. the alt text) still has one source.
+    """
+    by_name = {s['sku']: s for s in build_etsy_kit.SKUS}
+    out = []
+    for row in db.all_listings():
+        if row.get('etsy_listing_id') and row['sku'] in by_name:
+            out.append(by_name[row['sku']])
+    return out
+
+
+def update_images(e: Etsy, s: dict) -> str:
+    """Replace all 5 listing images on an existing listing with the current mockups.
+
+    Uploads the 5 new images BEFORE deleting any old one, mirroring update_file's safety
+    property — a live listing must never be left without gallery images.
+    """
+    row = db.get(s['sku'])
+    if not row or not row['etsy_listing_id']:
+        raise EtsyError('%s has no listing yet' % s['sku'])
+    lid = row['etsy_listing_id']
+
+    img_dir = os.path.join(config.OUT, 'etsy', s['sku'])
+    missing = [n for n in IMAGE_NAMES if not os.path.exists(os.path.join(img_dir, n))]
+    if missing:
+        raise EtsyError('%s missing image(s): %s' % (s['sku'], ', '.join(missing)))
+
+    before = e.listing_images(lid).get('results', [])
+    old_ids = [im['listing_image_id'] for im in before]
+
+    alt_text = s['headline'].replace('\n', ' ')
+    for rank, name in enumerate(IMAGE_NAMES, start=1):
+        e.upload_image(lid, os.path.join(img_dir, name), rank=rank, alt_text=alt_text)
+
+    after = e.listing_images(lid).get('results', [])
+    if not [im for im in after if im['listing_image_id'] not in old_ids]:
+        raise EtsyError('new images did not appear — leaving the old ones in place')
+
+    removed = 0
+    for iid in old_ids:
+        e.delete_listing_image(lid, iid)
+        removed += 1
+    return 'uploaded 5 images, removed %d old one(s)' % removed
+
+
 def preflight() -> bool:
     """Everything checkable before the OAuth consent. Returns True if ready to go."""
     print('Etsy app')

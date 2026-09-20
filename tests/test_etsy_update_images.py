@@ -13,7 +13,8 @@ import pytest
 import build_etsy_kit as kit
 from etsypub import config, db
 from etsypub.client import EtsyError
-from etsypub.publish import live_skus, update_images
+import etsypub.publish as publish
+from etsypub.publish import live_skus, run_update_images, update_images
 
 IMAGE_NAMES = ('01_main.png', '02_inside.png', '03_included.png',
               '04_pin.png', '05_wide.png')
@@ -176,3 +177,25 @@ def test_live_skus_only_returns_rows_with_a_listing_id(monkeypatch):
 
     assert [s['sku'] for s in result] == [a]
     assert result[0] is sku(a)
+
+
+# --------------------------------------------------------------- run_update_images
+
+def test_dry_run_makes_no_network_calls(monkeypatch):
+    def boom():
+        raise AssertionError('Etsy() must not be constructed on --dry-run')
+    monkeypatch.setattr(publish, 'Etsy', boom)
+
+    result = run_update_images([SKU], dry_run=True)
+
+    assert result['ready'] == [SKU['sku']]
+
+
+def test_dry_run_respects_limit(monkeypatch):
+    monkeypatch.setattr(publish, 'Etsy', lambda: (_ for _ in ()).throw(
+        AssertionError('must not construct Etsy()')))
+    other = sku([s['sku'] for s in kit.SKUS if s['sku'] != SKU['sku']][0])
+
+    result = run_update_images([SKU, other], dry_run=True, limit=1)
+
+    assert result['ready'] == [SKU['sku']]

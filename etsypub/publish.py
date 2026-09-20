@@ -348,6 +348,40 @@ def update_images(e: Etsy, s: dict) -> str:
     return 'uploaded 5 images, removed %d old one(s)' % removed
 
 
+def run_update_images(skus: list[dict], *, dry_run: bool = False,
+                      limit: int | None = None) -> dict:
+    """Drive update_images() over a selection already narrowed by main().
+
+    Split out from main() so --dry-run is testable without argv/Etsy() plumbing:
+    dry-run must make no network calls at all, and this never constructs Etsy() unless
+    it is actually about to talk to the API.
+    """
+    if limit:
+        skus = skus[:limit]
+
+    if dry_run:
+        print('\nDRY RUN — nothing sent to Etsy.\n')
+        for s in skus:
+            print('  %-28s -> would update images' % s['sku'])
+        return {'ready': [s['sku'] for s in skus]}
+
+    e = Etsy()
+    done, failed = [], []
+    for i, s in enumerate(skus):
+        print('\n%s' % s['sku'])
+        try:
+            print('  ' + update_images(e, s))
+            done.append(s['sku'])
+        except Exception as exc:                          # noqa: BLE001 - per listing
+            failed.append(s['sku'])
+            print('  FAILED: %s' % exc)
+        if i < len(skus) - 1:
+            time.sleep(random.uniform(config.JITTER_MIN, config.JITTER_MAX))
+
+    print('\nimages updated: %d ok, %d failed' % (len(done), len(failed)))
+    return {'done': done, 'failed': failed}
+
+
 def preflight() -> bool:
     """Everything checkable before the OAuth consent. Returns True if ready to go."""
     print('Etsy app')
@@ -459,7 +493,19 @@ def main() -> None:
                     help='is the app approved and is everything ready to list?')
     ap.add_argument('--update-files', action='store_true',
                     help='replace the PDF on existing listings with the current build')
+    ap.add_argument('--update-images', action='store_true',
+                    help='replace the gallery images on existing listings with the '
+                         'current mockups (default: every live listing, not just volumes)')
     a = ap.parse_args()
+
+    if a.update_images:
+        db.init_db()
+        skus = live_skus()
+        if a.skus:
+            names = set(x.strip() for x in a.skus.split(','))
+            skus = [s for s in skus if s['sku'] in names]
+        run_update_images(skus, dry_run=a.dry_run, limit=a.limit)
+        return
 
     if a.update_files:
         db.init_db()

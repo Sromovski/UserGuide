@@ -76,6 +76,28 @@ def test_no_sku_renders_its_badge_off_canvas():
     assert offenders == [], '\n'.join(offenders)
 
 
+def test_wide_render_paints_the_badge_when_present():
+    s = catalogue.all_specs()['12-start-here']
+    assert s.badge
+    img = render.render(s, 'wide').convert('RGB')
+    pal = s.palette
+    w, h = img.size
+    px = img.load()
+    hits = sum(1 for y in range(h) for x in range(w) if px[x, y] == pal.badge_bg)
+    assert hits > 0
+
+
+def test_wide_render_paints_no_badge_colour_when_the_spec_has_no_badge():
+    s = catalogue.all_specs()['01-prompt-vault']
+    assert s.badge == ''
+    img = render.render(s, 'wide').convert('RGB')
+    pal = s.palette
+    w, h = img.size
+    px = img.load()
+    hits = sum(1 for y in range(h) for x in range(w) if px[x, y] == pal.badge_bg)
+    assert hits == 0
+
+
 def test_rotation_matches_the_css_direction():
     # CSS rotate(+N) is clockwise; PIL rotate(+N) is counter-clockwise. The
     # constants come from the CSS, so the renderer must negate on the way in.

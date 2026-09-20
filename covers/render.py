@@ -208,7 +208,16 @@ def _render_portrait(spec, size):
 
 
 def _render_wide(spec, size):
-    """Gumroad's grid is landscape: title block left, stack right."""
+    """Gumroad's grid is landscape: title block left, stack right.
+
+    Draws the badge (VOL n / EDITABLE RATES / FREE etc.) top-right when the
+    spec carries one -- it is the product's differentiator on a storefront
+    tile (12-start-here is free and that needs to be visible at a glance,
+    every volume loses its "VOL n" without it). Deliberately does NOT draw
+    the portrait layout's footer strip: "INSTANT PDF DOWNLOAD" is redundant
+    on a 1280x720 tile that Gumroad's own listing chrome already marks as a
+    digital download.
+    """
     w, h = size
     pal = spec.palette
     base = gradient(size, pal.grad).convert('RGBA')
@@ -227,6 +236,8 @@ def _render_wide(spec, size):
     d.text((pad, y), spec.subtitle, font=sf, fill=pal.muted + (255,))
 
     _stack(base, spec, (sx0, int(h * 0.10), w - pad, int(h * 0.90)), pal)
+    if spec.badge:
+        _badge(base, spec.badge, w - pad, int(h * 0.08), pal, h)
     return base.convert('RGB')
 
 

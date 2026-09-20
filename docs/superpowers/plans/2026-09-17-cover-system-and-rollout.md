@@ -19,7 +19,7 @@
 - All five palettes are **light**. The dark `#0F0F1A` house style applies to interiors only.
 - No vendor logos, wordmarks or icons. Palette only.
 - Cover PDF page: square render, full-bleed on US Letter (612×792 pt), 200 DPI, JPEG q92.
-- `audit_pdfs.py` must report clean for every rebuilt PDF before the run is considered successful.
+- `audit_pdfs.py` runs over the whole catalogue as a release check (Task 7 Step 9) and its output is reviewed before the work is called done. It is deliberately **not** a per-file gate inside `rebuild_covers.py` — it encodes the volume geometry, and four SKUs are not volumes. The per-file gate is page-0-scoped.
 - Fonts come from `C:\Windows\Fonts` with the fallback chain already used by `build_etsy_kit.font()`: bold `seguibl.ttf` → `arialbd.ttf` → `segoeuib.ttf`; regular `segoeui.ttf` → `arial.ttf`.
 - Spine order is always back-left, back-right, front-centre (front drawn last).
 - Rotations are fixed: back-left `-8°`, front-centre `-2°`, back-right `+6°`, badge `+6°`. Single-kind covers use one spine at `-3°`.
@@ -502,9 +502,12 @@ def test_every_sku_declares_spines():
 
 
 def test_spine_labels_are_short_enough_to_read_on_a_spine():
+    # Check each spine's own lines. Joining the spines first would invent lines
+    # that span two labels and fail on correct data.
     for s in kit.SKUS:
-        for line in ' '.join(s['spines']).split('\n'):
-            assert len(line) <= 18, (s['sku'], line)
+        for spine in s['spines']:
+            for line in spine.split('\n'):
+                assert len(line) <= 18, (s['sku'], line)
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -691,8 +694,12 @@ def test_render_is_not_a_flat_fill():
 
 
 def test_fit_text_shrinks_a_long_string_to_fit():
-    f = render.fit_text('a very long product title indeed', 300, 120)
-    assert f.getbbox('a very long product title indeed')[2] <= 300
+    text = 'a very long product title indeed'
+    f = render.fit_text(text, 300, 120)
+    box = f.getbbox(text)
+    # Measure the way fit_text measures — advance width, not the right edge,
+    # so a non-zero left side bearing cannot make this disagree with the code.
+    assert box[2] - box[0] <= 300
 
 
 def test_fit_text_refuses_to_go_below_the_floor():
@@ -1376,17 +1383,27 @@ def splice(pdf_path, cover_bytes):
 
 
 def _verify(pdf_path):
+    """Check page 0 — the only page this script touches.
+
+    Deliberately NOT a whole-document audit. audit_pdfs.py encodes the volume
+    geometry (MX 46.8pt, 22pt footer), but four SKUs are not volumes: the Cheat
+    Sheet Pack is a light single-wide-column printable, and the Cost Calculator
+    preview, Prompt Vault and Start Here each have their own layout. Gating on a
+    whole-document audit would let a pre-existing interior quirk in one of them
+    abort a rollout that only ever replaced page 1. The full audit still runs as
+    a release check over the whole catalogue — see the run instructions.
+    """
     doc = fitz.open(pdf_path)
-    if len(doc[0].get_image_info()) != 1:
+    try:
+        page = doc[0]
+        if len(page.get_image_info()) != 1:
+            raise AssertionError('page 1 of %s is not a single full-bleed image'
+                                 % os.path.basename(pdf_path))
+        if page.get_text().strip():
+            raise AssertionError('page 1 of %s still carries text'
+                                 % os.path.basename(pdf_path))
+    finally:
         doc.close()
-        raise AssertionError('page 1 of %s is not a single full-bleed image'
-                             % os.path.basename(pdf_path))
-    doc.close()
-    _n, _meta, issues = audit_pdfs.audit(pdf_path)
-    if issues:
-        raise AssertionError('audit found %s in %s'
-                             % (dict((k, len(v)) for k, v in issues.items()),
-                                os.path.basename(pdf_path)))
 
 
 def rebuild(sku_filter=None, dry_run=False):
@@ -1552,32 +1569,37 @@ Expected: FAIL — `img_main` still composites a page, and `img_pin` does not ex
 
 - [ ] **Step 3: Replace `img_main` and add the two new renderers**
 
-In `build_etsy_kit.py`, add the import near the top:
+Replace the whole body of `img_main` (currently at line 678) and add the two new functions beside it.
+
+**Import `covers` inside the functions, not at module top.** `covers/catalogue.py` imports
+`build_etsy_kit`, so a module-level import here would form a cycle. It would happen to
+resolve today — neither module touches the other's attributes at import time — but that is
+an accident, not a design, and the next person to add a module-level constant breaks it.
 
 ```python
-from covers import catalogue as _cov_catalogue
-from covers import render as _cov_render
-```
+def _cover_render(s, shape):
+    """Render this SKU's cover. Imported lazily: covers.catalogue imports this
+    module, and a module-level import here would make that a cycle."""
+    from covers import catalogue, render
+    return render.render(catalogue.spec_for(s), shape)
 
-Then replace the whole body of `img_main` (currently at line 678) and add the two new functions beside it:
 
-```python
 def img_main(s, pdf_path=None):
     """The Etsy main image — direction C, generated not composited.
 
     pdf_path is accepted and ignored; kept so existing callers still work.
     """
-    return _cov_render.render(_cov_catalogue.spec_for(s), 'square')
+    return _cover_render(s, 'square')
 
 
 def img_pin(s):
     """1000x1500 for Pinterest."""
-    return _cov_render.render(_cov_catalogue.spec_for(s), 'pin')
+    return _cover_render(s, 'pin')
 
 
 def img_wide(s):
     """1280x720 for the Gumroad storefront grid, which is landscape."""
-    return _cov_render.render(_cov_catalogue.spec_for(s), 'wide')
+    return _cover_render(s, 'wide')
 ```
 
 - [ ] **Step 4: Write the new files in `main()`**

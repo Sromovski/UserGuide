@@ -185,6 +185,10 @@ class Etsy:
         # Uploads are shop-scoped, reads are not — the shop-scoped GET 404s.
         return self._req('GET', '/listings/%s/images' % listing_id)
 
+    def delete_listing_image(self, listing_id: int, image_id: int) -> dict:
+        return self._req('DELETE', '/shops/%s/listings/%s/images/%s'
+                         % (self.shop_id, listing_id, image_id))
+
     def update_listing(self, listing_id: int, **fields: Any) -> dict:
         return self._req('PATCH',
                          '/shops/%s/listings/%s' % (self.shop_id, listing_id),

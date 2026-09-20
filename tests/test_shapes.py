@@ -4,7 +4,8 @@ from covers import catalogue, render
 def test_shape_dimensions_match_the_destinations():
     assert render.SHAPES == {'square': (2000, 2000),
                              'wide': (1280, 720),
-                             'pin': (1000, 1500)}
+                             'pin': (1000, 1500),
+                             'letter': (1700, 2200)}
 
 
 def test_wide_is_landscape_so_gumroad_stops_cropping():

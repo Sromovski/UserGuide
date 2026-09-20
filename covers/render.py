@@ -13,7 +13,8 @@ FONT_DIR = r'C:\Windows\Fonts'
 BOLD = ['seguibl.ttf', 'arialbd.ttf', 'segoeuib.ttf']
 REG = ['segoeui.ttf', 'arial.ttf']
 
-SHAPES = {'square': (2000, 2000), 'wide': (1280, 720), 'pin': (1000, 1500)}
+SHAPES = {'square': (2000, 2000), 'wide': (1280, 720), 'pin': (1000, 1500),
+         'letter': (1700, 2200)}
 
 # rotation, in degrees, of each element. Fixed by the approved design.
 ROT_BACK_LEFT, ROT_FRONT, ROT_BACK_RIGHT = -8, -2, 6

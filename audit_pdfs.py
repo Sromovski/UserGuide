@@ -58,7 +58,9 @@ def audit(path):
         page = doc[pno]
         sp = spans(page)
         if not sp:
-            issues['blank'].append(pno + 1)
+            # A full-bleed cover carries no text spans but is not blank.
+            if not page.get_image_info():
+                issues['blank'].append(pno + 1)
             continue
         for bbox, text, size, font, lbox in sp:
             x0, y0, x1, y1 = bbox

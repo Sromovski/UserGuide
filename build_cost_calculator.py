@@ -232,6 +232,10 @@ def build_readme(wb):
     return ws
 
 
+# SUPERSEDED 2026-09-17 — page 1 of the shipped preview PDF is now rendered by
+# covers/ and spliced in by rebuild_covers.py. This function is retained so a
+# from-source rebuild still produces a complete document (page 2 is untouched);
+# run rebuild_covers.py afterwards.
 def build_preview_pdf():
     """A 2-page visual preview of the spreadsheet.
 

@@ -183,6 +183,9 @@ def measure():
 
 # ------------------------------------------------------------------ PDF pages
 
+# SUPERSEDED 2026-09-17 — page 1 of the shipped PDF is now rendered by covers/
+# and spliced in by rebuild_covers.py. This function is retained so a from-source
+# rebuild still produces a complete document; run rebuild_covers.py afterwards.
 def cover(c, pages):
     pg_bg(c)
     c.setFillColor(OG)

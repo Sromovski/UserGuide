@@ -861,6 +861,9 @@ def main():
                tagline='INSTRUCTIONS  ·  PROMPTS  ·  AGENTS  ·  SKILLS  ·  MCP  ·  HOOKS')
 
     total = 2 + 5 + 5 + 5 + 5 + 4
+    # SUPERSEDED 2026-09-17 — page 1 of the shipped PDF is now rendered by covers/
+    # and spliced in by rebuild_covers.py. This call is retained so a from-source
+    # rebuild still produces a complete document; run rebuild_covers.py afterwards.
     v.cover(
         stats=[('5', 'CHAPTERS'), (str(total), 'PAGES'), ('7', 'FILE TYPES'),
                ('2026', 'EDITION')],

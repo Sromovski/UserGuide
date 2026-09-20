@@ -146,6 +146,9 @@ def make_ftr():
     return _ftr
 
 
+# SUPERSEDED 2026-09-17 — page 1 of the shipped PDF is now rendered by covers/
+# and spliced in by rebuild_covers.py. This function is retained so a from-source
+# rebuild still produces a complete document; run rebuild_covers.py afterwards.
 def volume_cover(c, vol, titles, total_pages):
     pg_bg(c)
 

@@ -70,6 +70,22 @@ def test_dry_run_writes_nothing(tmp_path, monkeypatch):
     assert not os.path.exists(out / '_pre_cover_backup')
 
 
+def test_verify_rejects_a_page_that_is_not_full_bleed(tmp_path):
+    # A 1x1 image tucked in the corner passes "exactly one image, no text"
+    # but is obviously not the cover. The bbox check must catch it.
+    p = tmp_path / 'tiny.pdf'
+    doc = fitz.open()
+    page = doc.new_page(width=612, height=792)
+    pix = fitz.Pixmap(fitz.csRGB, (0, 0, 1, 1), False)
+    pix.set_rect(pix.irect, (255, 0, 0))
+    page.insert_image(fitz.Rect(0, 0, 10, 10), pixmap=pix)
+    doc.save(str(p))
+    doc.close()
+
+    with pytest.raises(AssertionError, match='full-bleed'):
+        rebuild_covers._verify(str(p))
+
+
 def test_a_failing_verify_does_not_stop_later_skus(tmp_path, monkeypatch):
     # One bad product must not hide the other twenty. _verify raising used to
     # propagate straight out of rebuild(), aborting the whole batch.

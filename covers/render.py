@@ -70,7 +70,7 @@ def gradient(size, stops):
     return small.resize((w, h), Image.BICUBIC)
 
 
-def _spine(size, colour, label, pal, text_w=None, align='left'):
+def _spine(size, colour, label, text_w=None, align='left'):
     """One book spine, unrotated, with its dark left edge and white rule."""
     w, h = size
     img = Image.new('RGBA', (w, h), colour + (255,))
@@ -148,7 +148,7 @@ def _stack(base, spec, box, pal):
         sw, sh = int(bw * 0.36), int(bh * 0.88)
         if sh > sw * MAX_BOOK_H_OVER_W:
             sh = int(sw * MAX_BOOK_H_OVER_W)
-        img = _spine((sw, sh), pal.spine_front, spec.spines[0], pal)
+        img = _spine((sw, sh), pal.spine_front, spec.spines[0])
         _paste_rotated(base, img, (x0 + bw * 0.50, y0 + bh * 0.50),
                        ROT_SINGLE, pal)
         return
@@ -165,13 +165,13 @@ def _stack(base, spec, box, pal):
         sh = int(sw * MAX_BOOK_H_OVER_W)
     if rh > rw * MAX_BOOK_H_OVER_W:
         rh = int(rw * MAX_BOOK_H_OVER_W)
-    _paste_rotated(base, _spine((sw, sh), pal.spine_back_left, back, pal,
+    _paste_rotated(base, _spine((sw, sh), pal.spine_back_left, back,
                                 text_w=int(sw * 0.55)),
                    (x0 + bw * 0.27, y0 + bh * 0.51), ROT_BACK_LEFT, pal)
-    _paste_rotated(base, _spine((rw, rh), pal.spine_back_right, right, pal,
+    _paste_rotated(base, _spine((rw, rh), pal.spine_back_right, right,
                                 text_w=int(bw * 0.42 * 0.55), align='right'),
                    (x0 + bw * 0.73, y0 + bh * 0.51), ROT_BACK_RIGHT, pal)
-    _paste_rotated(base, _spine((sw, sh), pal.spine_front, front, pal),
+    _paste_rotated(base, _spine((sw, sh), pal.spine_front, front),
                    (x0 + bw * 0.50, y0 + bh * 0.46), ROT_FRONT, pal)
 
 

@@ -68,9 +68,15 @@ def _verify(pdf_path):
     doc = fitz.open(pdf_path)
     try:
         page = doc[0]
-        if len(page.get_image_info()) != 1:
+        info = page.get_image_info()
+        if len(info) != 1:
             raise AssertionError('page 1 of %s is not a single full-bleed image'
                                  % os.path.basename(pdf_path))
+        bbox = fitz.Rect(info[0]['bbox'])
+        if bbox.width < 611 or bbox.height < 791:
+            raise AssertionError('page 1 of %s is not full-bleed: image bbox is '
+                                 '%.0fx%.0f' % (os.path.basename(pdf_path),
+                                                bbox.width, bbox.height))
         if page.get_text().strip():
             raise AssertionError('page 1 of %s still carries text'
                                  % os.path.basename(pdf_path))

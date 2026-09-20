@@ -14,7 +14,7 @@ import build_etsy_kit as kit
 from etsypub import config, db
 from etsypub.client import EtsyError
 import etsypub.publish as publish
-from etsypub.publish import live_skus, run_update_images, update_images
+from etsypub.publish import live_named_skus, live_skus, run_update_images, update_images
 
 IMAGE_NAMES = ('01_main.png', '02_inside.png', '03_included.png',
               '04_pin.png', '05_wide.png')
@@ -199,3 +199,49 @@ def test_dry_run_respects_limit(monkeypatch):
     result = run_update_images([SKU, other], dry_run=True, limit=1)
 
     assert result['ready'] == [SKU['sku']]
+
+
+# ---------------------------------------------------------------- live_named_skus
+
+def test_live_named_skus_narrows_a_valid_subset(monkeypatch):
+    real_names = [s['sku'] for s in kit.SKUS]
+    a, b = real_names[0], real_names[1]
+    monkeypatch.setattr(db, 'all_listings', lambda: [
+        {'sku': a, 'etsy_listing_id': 111},
+        {'sku': b, 'etsy_listing_id': 222},
+    ])
+
+    result = live_named_skus([a])
+
+    assert [s['sku'] for s in result] == [a]
+    assert result[0] is sku(a)
+
+
+def test_live_named_skus_raises_on_unknown_name(monkeypatch):
+    monkeypatch.setattr(db, 'all_listings', lambda: [])
+
+    with pytest.raises(SystemExit) as exc:
+        live_named_skus(['totally-not-a-real-sku'])
+
+    msg = str(exc.value)
+    assert 'totally-not-a-real-sku' in msg
+    assert 'No SKU named' in msg
+
+
+def test_live_named_skus_raises_distinctly_for_known_but_unlisted_sku(monkeypatch):
+    real_names = [s['sku'] for s in kit.SKUS]
+    listed, unlisted = real_names[0], real_names[1]
+    # `unlisted` is a real catalogue SKU, but the db has no listing id for it --
+    # never published, or a row that predates any Etsy draft.
+    monkeypatch.setattr(db, 'all_listings', lambda: [
+        {'sku': listed, 'etsy_listing_id': 111},
+    ])
+
+    with pytest.raises(SystemExit) as exc:
+        live_named_skus([unlisted])
+
+    msg = str(exc.value)
+    assert unlisted in msg
+    # Must be distinguishable from the "unknown name" message -- the fix here is
+    # "publish it first", not "check your spelling".
+    assert 'No SKU named' not in msg

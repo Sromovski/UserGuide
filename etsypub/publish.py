@@ -314,6 +314,28 @@ def live_skus() -> list[dict]:
     return out
 
 
+def live_named_skus(names: list[str]) -> list[dict]:
+    """--skus, validated against the live set, for --update-images.
+
+    A typo here must not silently narrow to nothing — that reads as a confident
+    '0 ok, 0 failed' run on a tool that just shipped nothing. Two distinct failures are
+    worth telling apart, because they need different fixes from the user:
+      - the name isn't a catalogue SKU at all -> same message named_skus() already gives
+      - it IS a catalogue SKU, just not published on Etsy yet -> say that specifically;
+        the fix is "publish it first", not "check your spelling"
+    """
+    named_skus(names)  # raises, naming the known catalogue, if any name is unrecognised
+    live = {s['sku'] for s in live_skus()}
+    unlisted = [n for n in names if n not in live]
+    if unlisted:
+        raise SystemExit(
+            '%s: known SKU(s) with no Etsy listing id in the db yet — publish first '
+            '(python -m etsypub.publish --skus %s). Currently live: %s'
+            % (', '.join(unlisted), ','.join(unlisted), ', '.join(sorted(live))))
+    by_name = {s['sku']: s for s in build_etsy_kit.SKUS}
+    return [by_name[n] for n in names]
+
+
 def update_images(e: Etsy, s: dict) -> str:
     """Replace all 5 listing images on an existing listing with the current mockups.
 
@@ -500,10 +522,11 @@ def main() -> None:
 
     if a.update_images:
         db.init_db()
-        skus = live_skus()
         if a.skus:
-            names = set(x.strip() for x in a.skus.split(','))
-            skus = [s for s in skus if s['sku'] in names]
+            names = [x.strip() for x in a.skus.split(',')]
+            skus = live_named_skus(names)
+        else:
+            skus = live_skus()
         run_update_images(skus, dry_run=a.dry_run, limit=a.limit)
         return
 

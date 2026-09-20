@@ -22,9 +22,14 @@ def test_rejects_more_than_two_title_lines():
         ok(title_lines=('a', 'b', 'c'))
 
 
-def test_rejects_empty_title():
-    with pytest.raises(ValueError, match='title_lines'):
+def test_rejects_no_title_lines():
+    with pytest.raises(ValueError, match='1 or 2 lines'):
         ok(title_lines=())
+
+
+def test_rejects_an_empty_title_line():
+    with pytest.raises(ValueError, match='must not contain empty strings'):
+        ok(title_lines=('Title', ''))
 
 
 def test_rejects_more_than_three_spines():

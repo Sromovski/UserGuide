@@ -1,0 +1,11 @@
+# LIVE CREDENTIALS — Etsy keystring, shared secret, refresh token, Gumroad
+# access token. The GitHub repo is public. This line is load-bearing.
+.env
+
+__pycache__/
+*.pyc
+outputs/
+logs/
+etsy.db
+.superpowers/
+~$*

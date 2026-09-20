@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "_comment": "SessionStart stdout IS shown to Claude, so this injects live repo state into context at the start of every session. Cheaper and always-current versus writing it in CLAUDE.md.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "timeout": 20,
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" 2>/dev/null || exit 0; echo '--- repo state ---'; echo \"branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null)\"; echo 'recent commits:'; git log --oneline -5 2>/dev/null; echo 'uncommitted files:'; git status --porcelain 2>/dev/null | head -20; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

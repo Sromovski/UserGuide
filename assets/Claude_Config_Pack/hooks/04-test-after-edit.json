@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "statusMessage": "Running tests...",
+            "timeout": 300,
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *src/*|*app/*|*lib/*) ;; *) exit 0;; esac; cd \"$CLAUDE_PROJECT_DIR\" || exit 0; out=$(npm test --silent -- --run 2>&1) || { echo \"Tests failed after editing $f:\" >&2; echo \"$out\" | tail -40 >&2; exit 2; }; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

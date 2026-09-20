@@ -489,6 +489,59 @@ Part of the Claude AI Field Guide Series — 20 guides covering every way to use
 
 ## NOTES & DECISIONS LOG
 
+- 2026-09-20: **COVER SYSTEM REBUILT — all 21 live products, new art, `covers/` package.**
+  Owner feedback: nothing on Gumroad sold; covers must look like a 2026 digital product.
+  New `covers/` package is the ONLY thing that knows what a cover looks like:
+  `palette.py` (5 series palettes) + `spec.py` (`CoverSpec`, validates in `__post_init__`)
+  + `catalogue.py` (derives specs from `build_etsy_kit.SKUS` — no second catalogue)
+  + `render.py` (one Pillow renderer) + `pdfpage.py` (one-page Letter PDF).
+  Four shapes: `square` 2000x2000 (Etsy), `wide` 1280x720 (Gumroad — its grid is
+  LANDSCAPE and was side-cropping every square image), `pin` 1000x1500 (Pinterest),
+  `letter` 1700x2200 (the PDF cover page, exactly 8.5x11in at 200 DPI).
+  Design is "direction C": angled 3-book stack on a light gradient. **Covers are LIGHT
+  even though interiors stay dark #0F0F1A** — a dark thumbnail sinks into Etsy's white
+  search grid. Rolled out by `rebuild_covers.py`, which splices page 0 only; interiors
+  are never regenerated. Pristine originals in `outputs/_pre_cover_backup/`.
+  Spec + plan in `docs/superpowers/`. 65 tests.
+
+  **FOUR BUGS THAT PASSED A FULLY GREEN SUITE** — all invisible to assertions that
+  check image dimensions rather than layout. This is the lesson:
+  - **Pillow `Image.rotate(+N)` is COUNTER-clockwise; CSS `rotate(+Ndeg)` is CLOCKWISE.**
+    Angles transcribed from the CSS mockup made the whole stack fan backwards.
+    Negate at the Pillow boundary; keep the constants matching the design reference.
+  - **A badge ran off-canvas on 10 of 21 SKUs.** Pillow SILENTLY CLIPS a paste box past
+    the edge — no exception, image dimensions unchanged. Same hardcoded-width bug class
+    already logged four times in this file. `fit_text` measures before drawing; `_badge`
+    bypassed it. Now clamped, with a test scanning the right edge for badge ink.
+  - **`_letter_crop` amputated the badge on all 20 badged covers and clipped 6 titles**,
+    including the $29.99 flagship, which shipped reading "Claude AI Library" / "BEST VALU".
+    Cause: a square render centre-cropped to Letter drops 227px per side, exactly the band
+    the layout uses for its right margin. NEVER crop a composed layout to a new aspect —
+    render natively at that aspect. `_render_portrait` is parametric on (w, h); adding
+    `'letter'` to SHAPES was the whole fix. Per-task review could not see this: one task
+    verified the layout, another verified the crop arithmetic, nobody composed them.
+  - **Book proportions distorted in `wide` and `pin`** because spine WIDTH came from box
+    width and HEIGHT from box height, so any box that was not the square's aspect stretched
+    them. Two attempted fixes each regressed 4 SKUs (3 of them live) because the stack box
+    height varies per SKU with the title block. Settled by restoring the original formulas
+    and clamping BOOK ASPECT at 1.55 — never fires in square (max observed 1.47), fires
+    only in wide/pin. **Verify a layout change against EVERY SKU, not the one you looked at.**
+
+  **The cover page is deliberately a rasterised image with zero text spans.** One renderer
+  draws both the PDF cover and the listing image, so they cannot drift, and the four
+  cover-text-overflow bugs in this log become structurally impossible. `audit_pdfs.py`
+  was changed accordingly: a page with no text is only blank if it also has no images.
+  - `covers/catalogue.py` `PREFIX_PALETTE` FAILS CLOSED on an unknown filename prefix.
+    `ChatGPT_` -> gpt and `Grok_` -> grok are pre-registered; without this a new series
+    would have rendered silently in Claude orange.
+  - **NOT DONE — blocks publishing, not merging:** `etsypub` can update a listing's PDF
+    (`--update-files`) but has NO path to replace listing IMAGES on an already-published
+    listing (upload is gated behind a sticky `images_done` flag). Nothing consumes
+    `05_wide.png` yet either. Publishing as-is would ship new covers inside the PDFs
+    behind the OLD thumbnails. Needs `--update-images` first.
+  - **Also open:** `rebuild_covers.splice()` writes via `os.replace` BEFORE `_verify` runs,
+    so a failing SKU leaves a spliced-but-unverified file with no rollback to the backup.
+
 - 2026-06-25: Series planned, Guide 01 (Web) completed
 - 2026-06-25: CLAUDE.md created, 20-guide series mapped
 - 2026-06-25: Guides 01–07 completed (Volumes 1–2 partial)

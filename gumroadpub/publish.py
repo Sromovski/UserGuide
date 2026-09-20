@@ -131,8 +131,22 @@ def description_html(s):
     return ''.join(parts)
 
 
+def _is_landscape(im):
+    """True only when both dimensions are known and width exceeds height. Missing or
+    zero dimension keys are treated as not-landscape rather than raising."""
+    w = im.get('full_width') or 0
+    h = im.get('full_height') or 0
+    return w > h
+
+
 def etsy_cover_urls(sku):
-    """Public mockup URLs from the matching Etsy listing, if there is one."""
+    """Public mockup URLs from the matching Etsy listing, if there is one.
+
+    Gumroad's cover endpoint crops to the image it's given, so a landscape mockup
+    (e.g. the 1280x720 Gumroad tile) is put ahead of the square 2000x2000 ones rather
+    than always handing Gumroad the square rank-1 image. Sort is stable, so relative
+    order is otherwise unchanged.
+    """
     try:
         from etsypub import db as etsy_db
         from etsypub.client import Etsy
@@ -140,6 +154,7 @@ def etsy_cover_urls(sku):
         if not row or not row.get('etsy_listing_id'):
             return []
         ims = Etsy().listing_images(row['etsy_listing_id']).get('results', [])
+        ims = sorted(ims, key=lambda im: not _is_landscape(im))
         return [i['url_fullxfull'] for i in ims if i.get('url_fullxfull')]
     except Exception:                                              # noqa: BLE001
         return []

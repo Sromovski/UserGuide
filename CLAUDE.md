@@ -489,6 +489,66 @@ Part of the Claude AI Field Guide Series — 20 guides covering every way to use
 
 ## NOTES & DECISIONS LOG
 
+- 2026-09-20: **ETSY FULLY REPUBLISHED — 21 products, new covers, matching PDFs.**
+  `--update-images` pushed 5 images to all 20 existing listings (20 ok / 0 failed), then
+  `--update-files` pushed the rebuilt PDFs (20 ok / 1 benign fail). **ChatGPT Volume 1 is
+  LIVE** — listing 4579194466, $9.99, activated for $0.20. Catalogue is now 21 Etsy SKUs.
+  Verified after the fact: every listing holds exactly ONE file and the remote byte sizes
+  match the local builds.
+  - The one `--update-files` failure was `40-chatgpt-v1`: *"File ... is already attached to
+    this listing"*. **Etsy dedupes by content** — that listing got the identical PDF at
+    draft creation an hour earlier, so the re-upload was refused. Benign. It also proved
+    per-SKU error isolation works: one failure did not abort the other twenty.
+  - **`--status` lagging is normal.** Immediately after activation Etsy still reported the
+    listing as `draft`; it reconciled to `active` minutes later. Do not "fix" a mismatch
+    seen seconds after an activation — re-check first.
+  - **Listing GETs are listing-scoped, not shop-scoped.** `GET /shops/{s}/listings/{id}`
+    404s; `GET /listings/{id}` works. Same asymmetry already logged for images, now
+    confirmed for the listing itself.
+  - **The shop holds 74 active listings but only 21 are ours** — the other 53 are POD
+    t-shirts from `TShirt1` sharing the shop. Checked and classified: **zero** are digital
+    or AI products, so nothing competes with the guides. Expect this gap in `--status`.
+
+- 2026-09-20: **etsypub gaps closed** (branches merged to main; 94 tests).
+  - `--update-images` ADDED — there was previously NO way to replace listing images on an
+    already-published listing; `build_draft` gates image upload behind a sticky
+    `images_done` flag. Without it the shop would have shown old thumbnails over new PDFs.
+  - `--update-files` previously covered only the 6 volume SKUs, ignored `--skus`, and
+    **ignored `--dry-run` entirely** — typing it would have silently mutated 6 live
+    listings. It now covers every live listing and short-circuits before `Etsy()` is even
+    constructed. Both flags share one driver (`run_over_live`).
+  - `build_draft` uploaded only 3 images; now 5, and `check()` validates all five
+    pre-flight. The missing one was `05_wide.png`, which `gumroadpub.etsy_cover_urls`
+    needs — without it Gumroad keeps cropping the square cover.
+  - `gumroadpub.etsy_cover_urls` now PREFERS LANDSCAPE (`full_width > full_height`).
+    Etsy must keep the square at rank 1, so sorting at the Gumroad end is the only way
+    both channels get the right shape.
+  - `--skus` on these flags now RAISES on an unknown name, and raises a *different*
+    message for a known-but-unlisted SKU ("publish it first"). A publishing tool that
+    silently does nothing looks like success.
+
+- 2026-09-20: **ChatGPT Volume 1 built** — `build_chatgpt_v1.py`, 27pp, audit clean, 66%
+  fill. Violet accent `#B45CFF`, NOT OpenAI green: `CODEX` already owns `#10A37F`, and at
+  thumbnail size two OpenAI products in the same green merge into one another on the shop
+  page. Cover palette `gpt` was changed to match after a side-by-side shelf comparison.
+  - **Ch 4 was swapped before writing.** The approved outline said "Custom GPTs — build
+    one". OpenAI is RETIRING them: migration opened 17 Sep 2026, new creation ends
+    **25 Sep 2026**, they stop running **11 Dec 2026**. Teaching a buyer to build one would
+    have been the Brave-Search-free-tier mistake again. Ch 4 is now Plugins & Connected
+    Apps, and the retirement table is the volume's differentiator — competing guides still
+    teach building GPTs. **This content decays: after 11 Dec it needs rewriting.**
+  - Also verified and printed: Pro $200 **new sign-ups are PAUSED** (since 10 Sep 2026);
+    existing subs and Pro $100 unaffected. Plans are Free / Go $8 / Plus $20 / Pro $100
+    (5x) / Pro $200 (20x). All pricing is on ONE page so a reprint is one edit.
+  - Ch 5 limits are NOT printed as fact — OpenAI does not publish image-generation
+    numbers. The book says so. Codex V4 precedent: an acknowledged gap beats an invented
+    figure.
+  - **`Theme.series_display` replaces `theme.series.title()`.** `.title()` turned
+    'CHATGPT ...' into '**Chatgpt** ...' on all 27 pages AND in the PDF author metadata.
+    Build was clean, audit was clean, 80 tests passed — nothing checks what a footer SAYS.
+    Caught only by reading the PDF. Note `'CLAUDE AI ...'.title()` gives 'Claude **Ai**',
+    which is also wrong but ships on live products; pinned in a test, deliberately unfixed.
+
 - 2026-09-20: **COVER SYSTEM REBUILT — all 21 live products, new art, `covers/` package.**
   Owner feedback: nothing on Gumroad sold; covers must look like a 2026 digital product.
   New `covers/` package is the ONLY thing that knows what a cover looks like:

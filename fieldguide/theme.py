@@ -82,4 +82,20 @@ CODEX = Theme(
     code_bg='#060908',
 )
 
-THEMES = {t.name: t for t in (CLAUDE, COPILOT, CODEX)}
+GPT = Theme(
+    name='gpt',
+    series='CHATGPT FIELD GUIDE SERIES',
+    bg='#0F0F1A',
+    # CODEX already owns teal-green (#10A37F) across four live products. A second
+    # near-identical green would make the two OpenAI-adjacent series indistinguishable
+    # on a shelf, so GPT takes a violet accent instead — distinct in hue from Claude's
+    # orange, Copilot's blue and Codex's green, and bright enough to read on the dark
+    # #0F0F1A interior. accent_dark/accent_darker follow the same darkening relationship
+    # the other three themes use for decorative circles and the badge background.
+    accent='#B45CFF',
+    accent_light='#D9A3FF',
+    accent_dark='#7A2EBF',
+    accent_darker='#5C1F94',
+)
+
+THEMES = {t.name: t for t in (CLAUDE, COPILOT, CODEX, GPT)}

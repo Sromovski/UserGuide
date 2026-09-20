@@ -8,7 +8,7 @@ buy nothing. This exists so the Copilot and Codex series do not become a third
 copy-paste of the design system.
 """
 from .draw import CW, FOOTER_H, H, HEADER_H, MX, Painter, W, wrap
-from .theme import CLAUDE, CODEX, COPILOT, THEMES, Theme
+from .theme import CLAUDE, CODEX, COPILOT, GPT, THEMES, Theme
 
-__all__ = ['Painter', 'Theme', 'THEMES', 'CLAUDE', 'COPILOT', 'CODEX',
+__all__ = ['Painter', 'Theme', 'THEMES', 'CLAUDE', 'COPILOT', 'CODEX', 'GPT',
            'W', 'H', 'MX', 'CW', 'FOOTER_H', 'HEADER_H', 'wrap']

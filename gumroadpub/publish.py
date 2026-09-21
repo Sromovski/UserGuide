@@ -95,6 +95,14 @@ def all_rows():
                 con.execute('SELECT * FROM gumroad_listings ORDER BY sku').fetchall()]
 
 
+def ensure_all():
+    """A row for every catalogue SKU, so a SKU added to build_etsy_kit.SKUS is never
+    invisible to --status or the creation path just because nothing has pushed it yet."""
+    init_db()
+    for s in build_etsy_kit.SKUS:
+        ensure(s['sku'], s['price'])
+
+
 # ------------------------------------------------------------------- content
 
 def gumroad_name(s):
@@ -220,7 +228,7 @@ def push(g, s):
 
 
 def run(skus, *, dry_run=False, do_publish=False, limit=None):
-    init_db()
+    ensure_all()
     by_name = {s['sku']: s for s in build_etsy_kit.SKUS}
     chosen = [by_name[n] for n in skus] if skus else list(build_etsy_kit.SKUS)
     if limit:
@@ -345,24 +353,101 @@ def finish():
     status()
 
 
+def _live_permalink(p):
+    """A live product's stable identifier: custom_permalink, falling back to the
+    auto-assigned permalink when custom_permalink is absent or empty."""
+    return p.get('custom_permalink') or p.get('permalink')
+
+
+def reconcile(g=None, live=None):
+    """Repair local db rows against what Gumroad actually holds.
+
+    The db has drifted before: a product created and recorded, then deleted (or never
+    finished) on Gumroad's side, leaves the row claiming product_id/url/published that
+    no longer correspond to anything live. Trust the API, not the row.
+
+    Matches each catalogue SKU to a live product on permalink (see _live_permalink),
+    since that is the stable value chosen at creation time (permalink_for). A SKU with
+    no live match has product_id/url/published cleared so the creation path picks it
+    up again -- price is left untouched, it is not a Gumroad fact. A SKU with a live
+    match has product_id/url/published set from the API response.
+
+    Every catalogue SKU gets a db row first (ensure_all) so a SKU with no row yet --
+    e.g. one just added to build_etsy_kit.SKUS -- is not silently skipped.
+
+    Returns a list of (sku, before, after) for every row actually changed. Idempotent:
+    a second call against the same live state makes no changes and returns [].
+    """
+    ensure_all()
+    g = g or Gumroad()
+    if live is None:
+        live = g.products()
+
+    by_permalink = {}
+    for p in live:
+        pl = _live_permalink(p)
+        if pl:
+            by_permalink[pl] = p
+
+    corrections = []
+    for s in build_etsy_kit.SKUS:
+        sku = s['sku']
+        before = get(sku)
+        p = by_permalink.get(permalink_for(s))
+        if p:
+            fields = {'product_id': p.get('id'), 'url': p.get('short_url'),
+                     'published': 1 if p.get('published') else 0}
+        else:
+            fields = {'product_id': None, 'url': None, 'published': 0}
+
+        if any(before.get(k) != fields.get(k) for k in fields):
+            update(sku, **fields)
+            corrections.append((sku, before, get(sku)))
+
+    return corrections
+
+
 def status():
-    init_db()
+    ensure_all()
     rows = all_rows()
     print('%-28s %-9s %-10s %s' % ('SKU', 'PRICE', 'STATE', 'URL'))
     for r in rows:
         print('%-28s %-9s %-10s %s'
               % (r['sku'], r['price'] or '',
                  'published' if r['published'] else 'draft', r['url'] or ''))
+
     try:
-        live = Gumroad().products()
+        g = Gumroad()
+        live = g.products()
     except GumroadError as e:
         print('\nCannot reach Gumroad: %s' % e)
         return
+
+    corrections = reconcile(g, live)
+    if corrections:
+        print('\nReconciled against Gumroad:')
+        for sku, before, after in corrections:
+            if after['product_id']:
+                print('   %s: matched a live product -> product_id=%s published=%s'
+                      % (sku, after['product_id'], 'yes' if after['published'] else 'no'))
+            else:
+                print('   %s: NOT ON GUMROAD (db said published=%s) -- reset to '
+                     'not-created, the next create pass will pick it up'
+                     % (sku, 'yes' if before['published'] else 'no'))
+    else:
+        print('\nLocal state matches Gumroad.')
+
     print('\nGumroad holds %d product(s):' % len(live))
     for p in live:
         print('   %-9s %-10s %s' % (p.get('formatted_price'),
                                     'published' if p.get('published') else 'draft',
                                     p.get('name', '')[:70]))
+
+    published_local = sum(1 for r in all_rows() if r['published'])
+    if published_local != len(live):
+        print('\n*** WARNING: db marks %d SKU(s) published, but Gumroad holds only '
+             '%d product(s) total -- see the reconciliation above ***'
+             % (published_local, len(live)))
 
 
 def main():

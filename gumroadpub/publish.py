@@ -218,6 +218,13 @@ def push(g, s):
     if not row['covers_done']:
         covers = etsy_cover_urls(s['sku'])
         if covers:
+            # set_cover()/POST APPENDS -- it never replaces -- and the storefront
+            # thumbnail is whichever cover is main_cover_id, effectively the first
+            # one. Without clearing first, a refresh just grows the cover list and
+            # the stale (square) cover stays the thumbnail while the new
+            # landscape-first image lands further down. Clear, then re-add
+            # landscape-first, so main_cover_id lands on the right image.
+            g.clear_covers(pid)
             for u in covers[:3]:
                 g.set_cover(pid, u)
             update(s['sku'], covers_done=1)

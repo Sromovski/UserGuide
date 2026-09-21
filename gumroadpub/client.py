@@ -214,6 +214,32 @@ class Gumroad:
         return out.get('product', {})
 
     def set_cover(self, product_id: str, url: str) -> dict:
-        """Covers take a signed_blob_id or a public URL — not a raw upload."""
+        """Covers take a signed_blob_id or a public URL — not a raw upload.
+
+        POSTing here APPENDS a cover -- it never replaces the existing set. To
+        replace covers (rather than pile onto them), call clear_covers() first.
+        """
         return self._req('POST', '/products/%s/covers' % product_id,
                          data={'url': url})
+
+    def delete_cover(self, product_id: str, cover_id: str) -> dict:
+        """Remove one cover. Undocumented -- not in Gumroad's public API docs -- but
+        verified working live on 2026-09-20. Returns
+        {'success', 'covers', 'main_cover_id'}.
+
+        Exists because set_cover()/POST only appends: there is no replace endpoint,
+        so replacing the cover set means deleting the old ones first.
+        """
+        return self._req('DELETE', '/products/%s/covers/%s' % (product_id, cover_id))
+
+    def clear_covers(self, product_id: str) -> int:
+        """Delete every cover currently on the product. Tolerates a product with no
+        covers (returns 0 without calling DELETE). Returns how many were removed.
+
+        Call this before re-adding covers with set_cover() -- see its docstring for
+        why: POST appends rather than replaces.
+        """
+        covers = self.product(product_id).get('covers') or []
+        for cov in covers:
+            self.delete_cover(product_id, cov['id'])
+        return len(covers)

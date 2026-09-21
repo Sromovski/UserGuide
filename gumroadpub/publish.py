@@ -227,6 +227,66 @@ def push(g, s):
     return get(s['sku'])
 
 
+def refresh(skus, *, dry_run=False, limit=None):
+    """Re-push already-existing products: clear `files_done` / `covers_done` and call
+    `push()` again, so the rebuilt PDFs and the now-landscape-first covers
+    (`etsy_cover_urls`) actually reach Gumroad instead of staying stuck on whatever was
+    uploaded the first time.
+
+    Never creates a product -- a SKU with no `product_id` yet is reported and skipped,
+    not pushed. `--dry-run` makes no network call at all: it does not even construct a
+    `Gumroad()` client.
+    """
+    ensure_all()
+    by_name = {s['sku']: s for s in build_etsy_kit.SKUS}
+    chosen = [by_name[n] for n in skus] if skus else list(build_etsy_kit.SKUS)
+    if limit:
+        chosen = chosen[:limit]
+
+    targets, skipped = [], []
+    for s in chosen:
+        row = get(s['sku'])
+        if row and row.get('product_id'):
+            targets.append(s)
+        else:
+            skipped.append(s['sku'])
+
+    if skipped:
+        print('SKIPPED (not created yet -- --refresh never creates):')
+        for sku in skipped:
+            print('    - %s' % sku)
+
+    if dry_run:
+        print('\nDRY RUN -- nothing sent to Gumroad.\n')
+        for s in targets:
+            r = get(s['sku']) or {}
+            print('  %-28s %-8s -> clear files_done/covers_done, re-push (%s)'
+                  % (s['sku'], s['price'], r.get('url', '')))
+        return
+
+    if not targets:
+        print('\nNothing to refresh.')
+        return
+
+    g = Gumroad()
+    done, failed = [], []
+    for i, s in enumerate(targets):
+        print('\n%s' % s['sku'])
+        try:
+            update(s['sku'], files_done=0, covers_done=0)
+            push(g, s)
+            done.append(s['sku'])
+            print('  refreshed (files + covers re-uploaded)')
+        except Exception as exc:                                   # noqa: BLE001
+            failed.append(s['sku'])
+            update(s['sku'], error=str(exc))
+            print('  FAILED: %s' % exc)
+        if i < len(targets) - 1:
+            time.sleep(random.uniform(*JITTER))
+
+    print('\nrefresh: %d ok, %d failed' % (len(done), len(failed)))
+
+
 def run(skus, *, dry_run=False, do_publish=False, limit=None):
     ensure_all()
     by_name = {s['sku']: s for s in build_etsy_kit.SKUS}
@@ -471,6 +531,9 @@ def main():
     ap.add_argument('--status', action='store_true')
     ap.add_argument('--finish', action='store_true',
                     help='create whatever is left, verify, then publish what passes')
+    ap.add_argument('--refresh', action='store_true',
+                    help='re-push files + covers for already-existing products; '
+                         'never creates')
     ap.add_argument('--limit', type=int)
     a = ap.parse_args()
 
@@ -481,6 +544,9 @@ def main():
         finish()
         return
     skus = [s.strip() for s in a.skus.split(',')] if a.skus else None
+    if a.refresh:
+        refresh(skus, dry_run=a.dry_run, limit=a.limit)
+        return
     run(skus, dry_run=a.dry_run, do_publish=a.publish, limit=a.limit)
 
 

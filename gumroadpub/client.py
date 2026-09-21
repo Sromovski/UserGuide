@@ -6,6 +6,17 @@ IMPORTANT, and contrary to every public doc and forum post: **product creation v
 API works.** `POST /v2/products` is widely described as returning 404 / "dashboard only".
 Tested against a live account on 2026-08-01: it returns 200 and creates the product.
 
+**`GET /v2/products` is PAGINATED** (10 products/page, with `next_page_key` and
+`next_page_url` present in the response when more remain). `products()` used to return
+only the first page. That truncation caused real damage on 2026-09-20: a reconciliation
+run built on the truncated list concluded 11 live products did not exist, reset their
+healthy db rows to "not created", and triggered 9 create attempts Gumroad rejected with
+"Custom permalink is already used by another one of your products". Nothing was
+destroyed only because Gumroad refuses duplicate permalinks. `products()` now follows
+`next_page_url` until it runs out, with a page cap so a malformed `next_page_url` cannot
+loop forever -- and it raises rather than ever returning a partial list silently again.
+Do not "simplify" this back to a single GET.
+
 File attachment is a four-step presign flow. The API's own error message documents it:
 
     POST /v2/files/presign      {filename, file_size, content_type}
@@ -37,12 +48,21 @@ DAILY_CREATE_LIMIT = 10
 # S3 multipart minimum part size, except for the final part.
 PART_SIZE = 5 * 1024 * 1024
 
+# Prefix _req's BASE already carries. A next_page_url of "/v2/products?page_key=..."
+# must have this stripped before being handed back to _req, or the request becomes
+# ".../v2/v2/products?...".
+_V2_PREFIX = '/v2'
+
 
 class GumroadError(RuntimeError):
     pass
 
 
 class Gumroad:
+    # Sane cap on pages followed by products(): a malformed or cyclic next_page_url
+    # must never turn into an infinite loop. Real catalogues page out in single digits.
+    MAX_PRODUCT_PAGES = 50
+
     def __init__(self, token: Optional[str] = None):
         self.token = token or os.getenv('GUMROAD_ACCESS_TOKEN', '')
         if not self.token:
@@ -74,7 +94,24 @@ class Gumroad:
         return self._req('GET', '/user').get('user', {})
 
     def products(self) -> list[dict]:
-        return self._req('GET', '/products').get('products', [])
+        """Every product, following pagination. See the module docstring -- this used
+        to return only page one, and that truncation caused real damage."""
+        out: list[dict] = []
+        path = '/products'
+        pages = 0
+        while path:
+            pages += 1
+            if pages > self.MAX_PRODUCT_PAGES:
+                raise GumroadError(
+                    'products() exceeded %d pages -- next_page_url may be malformed; '
+                    'refusing to return a partial list' % self.MAX_PRODUCT_PAGES)
+            payload = self._req('GET', path)
+            out.extend(payload.get('products', []))
+            next_url = payload.get('next_page_url') or ''
+            if next_url.startswith(_V2_PREFIX + '/'):
+                next_url = next_url[len(_V2_PREFIX):]
+            path = next_url or None
+        return out
 
     def product(self, product_id: str) -> dict:
         return self._req('GET', '/products/%s' % product_id).get('product', {})

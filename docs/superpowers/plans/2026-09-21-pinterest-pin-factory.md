@@ -744,7 +744,7 @@ Report: total pins, pins per template, every skip and its reason, and the CSV pa
 save a contact sheet of one pin per template for a human to eyeball — a suite that only
 checks dimensions cannot see a pin that is ugly or unreadable.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add build_pins.py tests/test_build_pins.py

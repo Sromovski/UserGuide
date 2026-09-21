@@ -69,6 +69,39 @@ def test_clear_covers_on_a_product_with_no_covers_deletes_nothing_and_returns_ze
     assert n == 0
 
 
+def test_clear_covers_raises_but_reports_how_many_it_removed_before_failing():
+    """A mid-loop DELETE failure must not lose the partial progress: the exception it
+    raises carries how many covers were actually removed, so a caller (push()) can log
+    the true partial state instead of implying the clear either fully succeeded or did
+    nothing at all."""
+    g = _client()
+    covers = [{'id': 'c1'}, {'id': 'c2'}, {'id': 'c3'}, {'id': 'c4'}]
+    calls = []
+
+    def fake_req(method, path, **kw):
+        calls.append((method, path))
+        if method == 'GET':
+            return {'success': True, 'product': {'covers': covers}}
+        if path.endswith('/c3'):
+            raise RuntimeError('S3/API hiccup deleting c3')
+        return {'success': True, 'covers': [], 'main_cover_id': None}
+
+    g._req = fake_req
+
+    try:
+        g.clear_covers('PID')
+        raise AssertionError('expected clear_covers to raise')
+    except RuntimeError as exc:
+        assert getattr(exc, 'covers_removed', None) == 2
+
+    delete_calls = [c for c in calls if c[0] == 'DELETE']
+    assert delete_calls == [
+        ('DELETE', '/products/PID/covers/c1'),
+        ('DELETE', '/products/PID/covers/c2'),
+        ('DELETE', '/products/PID/covers/c3'),
+    ]
+
+
 # ---------------------------------------------------------------------- publish.push
 
 FAKE_SKUS = [
@@ -201,3 +234,75 @@ def test_push_with_no_etsy_covers_never_calls_clear_covers(monkeypatch, tmp_path
     assert g.calls == []
     row = publish.get('aa-widget')
     assert row['covers_done'] == 0
+
+
+class FakeGumroadClientCoverDeleteFailsPartway(FakeGumroadClient):
+    """Mirrors the real client.clear_covers() shape: deletes existing covers one at a
+    time, and the failing delete raises an exception carrying `.covers_removed` --
+    exactly like the real client -- rather than silently losing how far it got.
+    """
+
+    def __init__(self, existing_cover_ids, fail_at_index):
+        super().__init__()
+        self._existing = existing_cover_ids
+        self._fail_at = fail_at_index
+
+    def clear_covers(self, product_id):
+        removed = 0
+        for i, cover_id in enumerate(self._existing):
+            self.calls.append(('delete_cover', product_id, cover_id))
+            if i == self._fail_at:
+                exc = RuntimeError('boom deleting cover %s' % cover_id)
+                exc.covers_removed = removed
+                raise exc
+            removed += 1
+        return removed
+
+
+def test_push_still_sets_every_new_cover_when_clear_covers_fails_partway(
+        monkeypatch, tmp_path):
+    """A mid-loop DELETE failure must not leave the product with zero covers. push()
+    must catch the clear_covers() failure, report it, and still run the full
+    set_cover loop -- worst case is a few stale covers lingering alongside the correct
+    ones, never a product with no cover image at all.
+    """
+    _use_tmp_db(monkeypatch, tmp_path)
+    _seed_ready_for_covers('aa-widget', '$9.99')
+    monkeypatch.setattr(publish, 'etsy_cover_urls',
+                        lambda sku: ['http://img/a', 'http://img/b', 'http://img/c'])
+
+    g = FakeGumroadClientCoverDeleteFailsPartway(
+        existing_cover_ids=['old1', 'old2', 'old3', 'old4', 'old5'], fail_at_index=2)
+
+    publish.push(g, {'sku': 'aa-widget', 'price': '$9.99'})          # must not raise
+
+    assert g.calls == [
+        ('delete_cover', 'PID', 'old1'),
+        ('delete_cover', 'PID', 'old2'),
+        ('delete_cover', 'PID', 'old3'),
+        ('set_cover', 'PID', 'http://img/a'),
+        ('set_cover', 'PID', 'http://img/b'),
+        ('set_cover', 'PID', 'http://img/c'),
+    ]
+    row = publish.get('aa-widget')
+    assert row['covers_done'] == 1
+
+
+def test_push_still_raises_when_set_cover_itself_fails(monkeypatch, tmp_path):
+    """clear_covers() failures are swallowed (see above), but a set_cover() failure is
+    not -- there is nothing further push() can do for that product at that point, and
+    the per-SKU handler in refresh()/run() must still see and record the error."""
+    _use_tmp_db(monkeypatch, tmp_path)
+    _seed_ready_for_covers('aa-widget', '$9.99')
+    monkeypatch.setattr(publish, 'etsy_cover_urls', lambda sku: ['http://img/a'])
+
+    class FailingSetCoverClient(FakeGumroadClient):
+        def set_cover(self, product_id, url):
+            raise RuntimeError('set_cover boom')
+
+    g = FailingSetCoverClient()
+    try:
+        publish.push(g, {'sku': 'aa-widget', 'price': '$9.99'})
+        raise AssertionError('expected push() to propagate the set_cover failure')
+    except RuntimeError as exc:
+        assert 'set_cover boom' in str(exc)

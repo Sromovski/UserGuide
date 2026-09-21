@@ -224,7 +224,27 @@ def push(g, s):
             # the stale (square) cover stays the thumbnail while the new
             # landscape-first image lands further down. Clear, then re-add
             # landscape-first, so main_cover_id lands on the right image.
-            g.clear_covers(pid)
+            #
+            # clear_covers() itself is NOT allowed to abort this step: if it fails
+            # partway (e.g. the 3rd of 5 deletes errors), the first 2 are already
+            # gone and the naive thing -- letting the exception propagate -- would
+            # skip the set_cover loop entirely and leave a LIVE product with ZERO
+            # covers, which looks broken to a shopper. A few stale covers lingering
+            # alongside the correct ones (fixable on the next refresh) is strictly
+            # better than that, so a clear_covers failure is caught, reported with
+            # however many it did remove, and the set_cover loop always runs. Same
+            # principle as etsypub.update_file uploading the new file before
+            # deleting the old one -- never leave a live listing worse off than it
+            # started. A set_cover failure, by contrast, IS allowed to propagate:
+            # there is nothing further this step can do for the product at that
+            # point, and the per-SKU handler in refresh()/run() needs to see it.
+            try:
+                g.clear_covers(pid)
+            except Exception as exc:                                # noqa: BLE001
+                removed = getattr(exc, 'covers_removed', 0)
+                print('  WARNING: clear_covers failed after removing %d existing '
+                     'cover(s) (%s) -- adding the new covers anyway; a stale cover '
+                     'may linger until the next refresh' % (removed, exc))
             for u in covers[:3]:
                 g.set_cover(pid, u)
             update(s['sku'], covers_done=1)

@@ -238,8 +238,20 @@ class Gumroad:
 
         Call this before re-adding covers with set_cover() -- see its docstring for
         why: POST appends rather than replaces.
+
+        If a DELETE fails partway through, the covers already deleted are already
+        gone -- there is no undo. Rather than silently lose that fact, the exception
+        raised carries how many succeeded before the failure as `.covers_removed`, so
+        a caller can report the true partial state ("removed 2 of 5") instead of
+        implying the clear either fully finished or did nothing at all.
         """
         covers = self.product(product_id).get('covers') or []
+        removed = 0
         for cov in covers:
-            self.delete_cover(product_id, cov['id'])
-        return len(covers)
+            try:
+                self.delete_cover(product_id, cov['id'])
+            except Exception as exc:                                # noqa: BLE001
+                exc.covers_removed = removed
+                raise
+            removed += 1
+        return removed

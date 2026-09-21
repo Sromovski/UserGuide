@@ -147,25 +147,44 @@ def _is_landscape(im):
     return w > h
 
 
+# Gumroad covers need a PUBLIC url and reject the S3 url its own presign flow
+# returns, so covers normally come from the product's Etsy listing images.
+# 12-start-here has no Etsy listing — it is free, and Etsy has no free tier — so
+# its covers are committed to this repo and served raw from GitHub instead.
+# Landscape first: Gumroad's storefront grid is landscape and uses the first cover
+# as the thumbnail. NOTE this only resolves while the repo is public.
+_RAW = 'https://raw.githubusercontent.com/Sromovski/UserGuide/main/assets/covers/'
+PUBLIC_COVERS = {
+    '12-start-here': [_RAW + 'start-here-wide.png', _RAW + 'start-here-square.png'],
+}
+
+
 def etsy_cover_urls(sku):
-    """Public mockup URLs from the matching Etsy listing, if there is one.
+    """Public mockup URLs from the matching Etsy listing, if there is one, else this
+    SKU's entry in PUBLIC_COVERS.
 
     Gumroad's cover endpoint crops to the image it's given, so a landscape mockup
     (e.g. the 1280x720 Gumroad tile) is put ahead of the square 2000x2000 ones rather
     than always handing Gumroad the square rank-1 image. Sort is stable, so relative
-    order is otherwise unchanged.
+    order is otherwise unchanged. PUBLIC_COVERS entries are already ordered wide-first
+    and are returned as-is -- the raw GitHub urls carry no dimension metadata to sort by.
+
+    The PUBLIC_COVERS fallback must apply whenever the Etsy lookup yields nothing --
+    no db row, no listing id, or the lookup raising outright -- so it lives outside
+    the try/except rather than only on one of those paths.
     """
     try:
         from etsypub import db as etsy_db
         from etsypub.client import Etsy
         row = etsy_db.get(sku)
         if not row or not row.get('etsy_listing_id'):
-            return []
+            return PUBLIC_COVERS.get(sku, [])
         ims = Etsy().listing_images(row['etsy_listing_id']).get('results', [])
         ims = sorted(ims, key=lambda im: not _is_landscape(im))
-        return [i['url_fullxfull'] for i in ims if i.get('url_fullxfull')]
+        urls = [i['url_fullxfull'] for i in ims if i.get('url_fullxfull')]
+        return urls or PUBLIC_COVERS.get(sku, [])
     except Exception:                                              # noqa: BLE001
-        return []
+        return PUBLIC_COVERS.get(sku, [])
 
 
 def check(s):

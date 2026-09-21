@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from etsypub import db as etsy_db
 from etsypub.client import Etsy
-from gumroadpub.publish import etsy_cover_urls
+from gumroadpub.publish import PUBLIC_COVERS, etsy_cover_urls
 
 
 class FakeEtsy:
@@ -60,3 +60,59 @@ def test_tolerates_images_missing_dimension_keys(monkeypatch):
     urls = etsy_cover_urls('some-sku')
 
     assert urls == ['http://img/wide', 'http://img/no-dims']
+
+
+# ------------------------------------------------------- PUBLIC_COVERS fallback
+#
+# 12-start-here is the free lead magnet -- it has no Etsy listing, because Etsy has
+# no free tier -- so it would otherwise ship with zero Gumroad covers (a blank tile).
+# Its covers are committed to this repo and served from raw.githubusercontent.com
+# instead. The fallback must apply whenever the Etsy lookup yields nothing, whatever
+# the reason: no db row, no listing id, or the lookup raising outright.
+
+def test_public_cover_sku_with_no_etsy_row_returns_public_urls(monkeypatch):
+    monkeypatch.setattr(etsy_db, 'get', lambda sku: None)
+
+    urls = etsy_cover_urls('12-start-here')
+
+    assert urls == PUBLIC_COVERS['12-start-here']
+
+
+def test_public_cover_sku_whose_etsy_lookup_raises_returns_public_urls(monkeypatch):
+    def _boom(sku):
+        raise RuntimeError('db is unreachable')
+    monkeypatch.setattr(etsy_db, 'get', _boom)
+
+    urls = etsy_cover_urls('12-start-here')
+
+    assert urls == PUBLIC_COVERS['12-start-here']
+
+
+def test_etsy_listing_takes_priority_over_public_fallback(monkeypatch):
+    # 12-start-here doesn't actually have a listing today, but if it ever did, real
+    # listing images must win -- the fallback must not shadow them.
+    wide = {'listing_image_id': 1, 'url_fullxfull': 'http://img/etsy-wide',
+            'full_width': 1280, 'full_height': 720}
+    _use(monkeypatch, [wide])
+
+    urls = etsy_cover_urls('12-start-here')
+
+    assert urls == ['http://img/etsy-wide']
+
+
+def test_sku_with_neither_etsy_nor_public_cover_returns_empty_list(monkeypatch):
+    monkeypatch.setattr(etsy_db, 'get', lambda sku: None)
+
+    urls = etsy_cover_urls('some-sku-with-nothing')
+
+    assert urls == []
+
+
+def test_public_covers_are_ordered_wide_then_square():
+    offenders = []
+    for sku, urls in PUBLIC_COVERS.items():
+        if len(urls) < 2:
+            continue
+        if 'wide' not in urls[0] or 'square' not in urls[1]:
+            offenders.append('%s: %r' % (sku, urls))
+    assert offenders == [], '\n'.join(offenders)

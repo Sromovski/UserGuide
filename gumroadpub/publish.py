@@ -408,7 +408,28 @@ def reconcile(g=None, live=None):
 
 
 def status():
-    ensure_all()
+    try:
+        g = Gumroad()
+        live = g.products()
+    except GumroadError as e:
+        # No live data to reconcile against -- fall back to printing local state as-is.
+        ensure_all()
+        print('%-28s %-9s %-10s %s' % ('SKU', 'PRICE', 'STATE', 'URL'))
+        for r in all_rows():
+            print('%-28s %-9s %-10s %s'
+                  % (r['sku'], r['price'] or '',
+                     'published' if r['published'] else 'draft', r['url'] or ''))
+        print('\nCannot reach Gumroad: %s' % e)
+        return
+
+    # Deliberately reconciled BEFORE the table is printed, not after: the table is what
+    # a human skimming --status actually reads, and showing a stale "published" for a
+    # product reconcile already knows is gone is the exact bug this module exists to
+    # catch, just moved into the display layer. Do not reorder this to match
+    # etsypub.publish.status() (which reconciles after printing) -- that's a separate,
+    # already-proven-against-live-listings tool; this ordering is deliberate here.
+    corrections = reconcile(g, live)
+
     rows = all_rows()
     print('%-28s %-9s %-10s %s' % ('SKU', 'PRICE', 'STATE', 'URL'))
     for r in rows:
@@ -416,14 +437,6 @@ def status():
               % (r['sku'], r['price'] or '',
                  'published' if r['published'] else 'draft', r['url'] or ''))
 
-    try:
-        g = Gumroad()
-        live = g.products()
-    except GumroadError as e:
-        print('\nCannot reach Gumroad: %s' % e)
-        return
-
-    corrections = reconcile(g, live)
     if corrections:
         print('\nReconciled against Gumroad:')
         for sku, before, after in corrections:

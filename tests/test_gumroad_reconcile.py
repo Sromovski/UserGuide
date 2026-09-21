@@ -129,3 +129,25 @@ def test_matching_falls_back_to_permalink_when_custom_permalink_missing_or_empty
             offenders.append('%s: got product_id=%r published=%r'
                              % (sku, row['product_id'], row['published']))
     assert offenders == []
+
+
+def test_status_table_shows_corrected_state_not_stale(monkeypatch, tmp_path, capsys):
+    """The top SKU table is what a human skimming --status actually reads. On a
+    divergent run it must show what reconcile() just determined is true, not what the
+    db said before reconcile ran -- printing a stale "published" for a product that
+    reconcile has already found is gone would reproduce the exact bug this module
+    exists to catch."""
+    _use_tmp_db(monkeypatch, tmp_path)
+    _seed('aa-widget', product_id='OLD-ID', url='https://sromov.gumroad.com/l/widget',
+         published=1)
+    live = [{'id': 'X', 'custom_permalink': 'gadget',
+             'short_url': 'https://sromov.gumroad.com/l/gadget', 'published': True}]
+    monkeypatch.setattr(publish, 'Gumroad', lambda *a, **k: FakeGumroad(live))
+
+    publish.status()
+
+    out = capsys.readouterr().out
+    table_lines = [l for l in out.splitlines() if l.startswith('aa-widget')]
+    assert table_lines, 'aa-widget row missing from the printed table'
+    assert 'published' not in table_lines[0], (
+        'table still shows the pre-reconcile state: %r' % table_lines[0])

@@ -78,3 +78,16 @@ def test_fitted_heading_raises_when_text_too_long():
     long_text = 'a' * 200  # 200 a's in Helvetica Bold won't fit in 856px at size 18
     with pytest.raises(ValueError):
         canvas.fitted_heading(img, long_text, 100, palette.get('claude'), max_size=18, floor=18)
+
+
+def test_footer_collision_catches_ink_in_the_footer_band():
+    from PIL import ImageDraw
+    pal = palette.get('claude')
+    img = canvas.new_pin(pal)
+    ImageDraw.Draw(img).rectangle([300, 1420, 700, 1440], fill=(0, 0, 0))
+    assert canvas.footer_collision(img, pal) is True
+
+
+def test_footer_collision_is_false_for_a_clean_pin():
+    pal = palette.get('claude')
+    assert canvas.footer_collision(canvas.new_pin(pal), pal) is False

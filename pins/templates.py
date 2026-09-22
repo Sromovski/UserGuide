@@ -105,6 +105,8 @@ def _hook(sku, pal):
     bar_y = max(y + 60, canvas.PIN_H - canvas.MARGIN - 260)
     d.rounded_rectangle([canvas.MARGIN, bar_y, canvas.MARGIN + 140, bar_y + 14],
                         radius=7, fill=pal.spine_front)
+    if canvas.footer_collision(img, pal):
+        return None
     canvas.footer(img, pal)
     return img
 
@@ -137,6 +139,8 @@ def _listicle(sku, pal):
         canvas.draw_block(img, canvas.MARGIN + 54, y, lines, 28, pal.title,
                           leading=1.34)
         y += slot
+    if canvas.footer_collision(img, pal):
+        return None
     canvas.footer(img, pal)
     return img
 
@@ -185,6 +189,8 @@ def _checklist(sku, pal):
         canvas.draw_block(img, text_x, yy, lines, size, pal.title, leading=1.34)
         yy += slot
 
+    if canvas.footer_collision(img, pal):
+        return None
     canvas.footer(img, pal)
     return img
 
@@ -245,6 +251,8 @@ def _comparison(sku, pal):
             d.line([(canvas.MARGIN, rule_y), (canvas.PIN_W - canvas.MARGIN, rule_y)],
                   fill=pal.muted, width=2)
         yy += row_h + gap
+    if canvas.footer_collision(img, pal):
+        return None
     canvas.footer(img, pal)
     return img
 
@@ -285,6 +293,8 @@ def _tip(sku, pal):
     d.line([(canvas.MARGIN, rule_y), (canvas.MARGIN + 90, rule_y)],
           fill=pal.spine_front, width=6)
 
+    if canvas.footer_collision(img, pal):
+        return None
     canvas.footer(img, pal)
     return img
 

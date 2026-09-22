@@ -114,3 +114,24 @@ def overflows(img, pal):
             if sum(abs(c[i] - r[i]) for i in range(3)) > 90:
                 return True
     return False
+
+
+def footer_collision(img, pal):
+    """True if content reaches the footer band or runs off the bottom.
+
+    overflows() watches the left and right margins; without this the guard has
+    no vertical axis at all, and a pin can print its last line straight over the
+    footer — or off the canvas — and still be reported clean. audit_pdfs.py has
+    had the equivalent footer-bar check for the PDFs since a pin-shaped version
+    of this bug shipped once already.
+
+    Call this BEFORE footer() is drawn, or the footer itself trips it.
+    """
+    bg = new_pin(pal).convert('RGB').load()
+    px = img.convert('RGB').load()
+    for y in range(PIN_H - MARGIN - 40, PIN_H):
+        for x in range(0, PIN_W, 2):
+            c, r = px[x, y], bg[x, y]
+            if sum(abs(c[i] - r[i]) for i in range(3)) > 90:
+                return True
+    return False

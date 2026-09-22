@@ -63,8 +63,8 @@ PALETTES = {
         key='grok',
         grad=((244, 245, 247), (228, 231, 236), (203, 210, 218)),
         title=(11, 13, 16), muted=(91, 100, 111),
-        spine_back_left=(35, 42, 51), spine_front=(11, 13, 16),
-        spine_back_right=(0, 184, 217),
+        spine_back_left=(35, 42, 51), spine_front=(0, 184, 217),
+        spine_back_right=(11, 13, 16),
         badge_bg=(11, 13, 16), badge_fg=(255, 255, 255),
         shadow=(20, 28, 40)),
 }

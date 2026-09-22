@@ -27,3 +27,11 @@ def test_get_rejects_unknown_key_and_names_the_valid_ones():
 
 def test_get_returns_the_named_palette():
     assert palette.get('gpt').key == 'gpt'
+
+
+def test_no_palette_uses_its_title_colour_as_its_accent():
+    # spine_front is the accent every pin template draws against title. If they
+    # match, numerals, tick boxes and the comparison's right column all vanish
+    # into body text and nothing fails.
+    same = [k for k, p in palette.PALETTES.items() if p.title == p.spine_front]
+    assert same == []

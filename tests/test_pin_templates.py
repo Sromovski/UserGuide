@@ -36,8 +36,9 @@ def test_no_template_paints_into_the_margin():
     offenders = []
     for name, fn in templates.TEMPLATES.items():
         for sku in pc.SKUS:
-            img = fn(sku, palette.get(pc.palette_key_for(sku)))
-            if img is not None and canvas.overflows(img):
+            pal = palette.get(pc.palette_key_for(sku))
+            img = fn(sku, pal)
+            if img is not None and canvas.overflows(img, pal):
                 offenders.append('%s/%s' % (name, sku))
     assert offenders == []
 

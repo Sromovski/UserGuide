@@ -70,22 +70,27 @@ def fits(text, max_w, start, floor=18, bold=True):
         return False
 
 
-def overflows(img):
+def overflows(img, pal):
     """True if ink sits inside the margin band.
 
-    The background is a gradient, so 'ink' means a pixel that differs markedly
-    from the background pixel at the same height on the opposite side of the
-    canvas. Cheap, and it catches the failure that matters: text running off.
-    2px of slack, not zero, because text drawn at exactly x=MARGIN antialiases
-    a pixel or so to its left. More slack than that would hide the boundary
-    overflows this guard exists to catch.
+    Compares each margin pixel against a freshly rendered background at the
+    same position. Two earlier versions were wrong in opposite directions: one
+    sampled the canvas centre (which is content, so any centred pin
+    false-positived), the other sampled the mirrored opposite margin (which a
+    centred heading defeats, because it overflows both sides by the same amount
+    in the same colour and ink got compared to ink).
+
+    band is MARGIN - 4, not MARGIN: covers' own portrait layout pads to 70px and
+    glyph antialiasing bleeds a pixel or two left of the pen position, so a
+    band of exactly MARGIN false-positives on the product template. 4px of
+    slack is far less than any real overflow.
     """
+    bg = new_pin(pal).convert('RGB').load()
     px = img.convert('RGB').load()
-    band = MARGIN - 2
+    band = MARGIN - 4
     for y in range(0, PIN_H, 4):
         for x in list(range(band)) + list(range(PIN_W - band, PIN_W)):
-            c = px[x, y]
-            ref = px[PIN_W - 1 - x, y]
-            if sum(abs(c[i] - ref[i]) for i in range(3)) > 90:
+            c, r = px[x, y], bg[x, y]
+            if sum(abs(c[i] - r[i]) for i in range(3)) > 90:
                 return True
     return False

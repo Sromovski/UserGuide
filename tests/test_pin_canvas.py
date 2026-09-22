@@ -29,21 +29,37 @@ def test_draw_block_returns_a_y_below_where_it_started():
 
 
 def test_overflows_is_false_for_an_empty_pin():
-    assert canvas.overflows(canvas.new_pin(palette.get('claude'))) is False
+    pal = palette.get('claude')
+    assert canvas.overflows(canvas.new_pin(pal), pal) is False
 
 
 def test_overflows_is_true_when_ink_sits_in_the_margin():
     from PIL import ImageDraw
-    img = canvas.new_pin(palette.get('claude'))
+    pal = palette.get('claude')
+    img = canvas.new_pin(pal)
     ImageDraw.Draw(img).rectangle([0, 700, 40, 760], fill=(0, 0, 0))
-    assert canvas.overflows(img) is True
+    assert canvas.overflows(img, pal) is True
 
 
 def test_overflows_catches_ink_just_inside_the_margin():
     from PIL import ImageDraw
-    img = canvas.new_pin(palette.get('claude'))
+    pal = palette.get('claude')
+    img = canvas.new_pin(pal)
     ImageDraw.Draw(img).rectangle([64, 700, 70, 760], fill=(0, 0, 0))
-    assert canvas.overflows(img) is True
+    assert canvas.overflows(img, pal) is True
+
+
+def test_overflows_catches_symmetric_overflow_in_both_margins():
+    # A centred heading that runs long overflows BOTH margins by the same amount
+    # in the same colour. A guard that compares one margin to the other compares
+    # ink to ink and passes, which is the failure this test exists to prevent.
+    from PIL import ImageDraw
+    pal = palette.get('claude')
+    img = canvas.new_pin(pal)
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 700, 40, 760], fill=(0, 0, 0))
+    d.rectangle([959, 700, 999, 760], fill=(0, 0, 0))
+    assert canvas.overflows(img, pal) is True
 
 
 def test_fits_returns_true_for_short_text():

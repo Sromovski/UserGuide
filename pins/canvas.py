@@ -70,6 +70,26 @@ def fits(text, max_w, start, floor=18, bold=True):
         return False
 
 
+def content_extent(img, pal):
+    """How far down the canvas real content reaches, as a fraction of height.
+
+    Measured against a freshly rendered background, ignoring the footer band,
+    so a pin that stacks everything at the top scores low. A pin is 2:3 because
+    the vertical space is the format's advantage; leaving the bottom half empty
+    throws that away.
+    """
+    bg = new_pin(pal).convert('RGB').load()
+    px = img.convert('RGB').load()
+    lowest = 0
+    for y in range(0, PIN_H - MARGIN - 40, 4):
+        for x in range(MARGIN - 4, PIN_W - MARGIN + 4, 4):
+            c, r = px[x, y], bg[x, y]
+            if sum(abs(c[i] - r[i]) for i in range(3)) > 90:
+                lowest = y
+                break
+    return lowest / float(PIN_H)
+
+
 def overflows(img, pal):
     """True if ink sits inside the margin band.
 

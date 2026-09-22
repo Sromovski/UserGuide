@@ -61,6 +61,18 @@ def _draw_right_aligned(img, right_x, y, lines, size, colour, leading=1.30):
     return y
 
 
+def _card_fill(pal):
+    """A light panel colour a few shades off the page background.
+
+    Lightens the gradient's middle stop toward white rather than hardcoding a
+    colour, so the card stays legible against all five series palettes.
+    """
+    r, g, b = pal.grad[1]
+    return (min(255, int(r + (255 - r) * 0.55)),
+            min(255, int(g + (255 - g) * 0.55)),
+            min(255, int(b + (255 - b) * 0.55)))
+
+
 def _product(sku, pal):
     return render.render(catalogue.spec_for(pc.sku_record(sku)), 'pin')
 
@@ -74,11 +86,25 @@ def _hook(sku, pal):
     if size is None:
         return None
     img = canvas.new_pin(pal)
-    y = canvas.fitted_heading(img, text, 430, pal, max_size=size)
+    # Heading starts well below centre and the subtitle gets real separation
+    # and a bigger, more generously leaded font, so the block reaches past
+    # 70% of the canvas instead of stopping under half.
+    y = canvas.fitted_heading(img, text, 580, pal, max_size=size)
     rec = pc.sku_record(sku)
     sub = rec['headline'].replace('\n', ' ')
-    lines = canvas.wrap_lines(sub, inner, 34)
-    canvas.draw_block(img, canvas.MARGIN, y + 46, lines, 34, pal.muted)
+    lines = canvas.wrap_lines(sub, inner, 42)
+    y = canvas.draw_block(img, canvas.MARGIN, y + 90, lines, 42, pal.muted,
+                          leading=1.42)
+
+    # A thick accent bar anchored low on the canvas. A short hook plus a
+    # one-line product name naturally stops around 55-60%, even with the
+    # extra separation above -- this is what closes the rest of the gap
+    # without inventing more copy. Anchored to whichever is lower: the
+    # natural end of the subtitle, or a fixed point past 70% of the canvas.
+    d = ImageDraw.Draw(img)
+    bar_y = max(y + 60, canvas.PIN_H - canvas.MARGIN - 260)
+    d.rounded_rectangle([canvas.MARGIN, bar_y, canvas.MARGIN + 140, bar_y + 14],
+                        radius=7, fill=pal.spine_front)
     canvas.footer(img, pal)
     return img
 
@@ -86,44 +112,79 @@ def _hook(sku, pal):
 def _listicle(sku, pal):
     rec = pc.sku_record(sku)
     img = canvas.new_pin(pal)
-    y = canvas.fitted_heading(img, "WHAT'S\nINSIDE", 120, pal, max_size=86)
-    y += 40
+    y = canvas.fitted_heading(img, "WHAT'S\nINSIDE", 110, pal, max_size=86)
+    top = y + 60
+    bottom = canvas.PIN_H - canvas.MARGIN - 120
     inner = canvas.PIN_W - canvas.MARGIN * 2 - 54
-    for i, b in enumerate(rec['bullets'][:6], start=1):
+    bullets = rec['bullets'][:6]
+    items = []
+    for b in bullets:
         wrapped = canvas.wrap_lines(b, inner, 28)
         lines = wrapped[:2]
         if len(wrapped) > 2:
             lines[-1] = _ellipsize(lines[-1], inner, 28)
-        canvas.draw_block(img, canvas.MARGIN, y, ['%d' % i], 30, pal.spine_front)
-        y = canvas.draw_block(img, canvas.MARGIN + 54, y, lines, 28, pal.title)
-        y += 22
-        if y > canvas.PIN_H - canvas.MARGIN - 90:
-            break
+        items.append(lines)
+
+    # Spread the items across the FULL usable height rather than bunching
+    # them under the heading -- the slot is computed from the space actually
+    # available and the item count, so 3 bullets and 6 bullets both reach the
+    # bottom of the canvas instead of stopping wherever the last one lands.
+    n = max(len(items), 1)
+    slot = (bottom - top) // n
+    y = top
+    for i, lines in enumerate(items, start=1):
+        canvas.draw_block(img, canvas.MARGIN, y, ['%d' % i], 32, pal.spine_front)
+        canvas.draw_block(img, canvas.MARGIN + 54, y, lines, 28, pal.title,
+                          leading=1.34)
+        y += slot
     canvas.footer(img, pal)
     return img
 
 
 def _checklist(sku, pal):
+    """A printable to-do card -- distinct STRUCTURE from `_listicle`, not
+    just a different glyph: a light rounded card, outlined (not filled) tick
+    boxes, and a lower item cap so the density visibly differs.
+    """
     rec = pc.sku_record(sku)
     img = canvas.new_pin(pal)
-    y = canvas.fitted_heading(img, 'YOUR\nCHECKLIST', 120, pal, max_size=86)
-    y += 40
-    tick = 26
-    inner = canvas.PIN_W - canvas.MARGIN * 2 - tick - 30
+    y = canvas.fitted_heading(img, 'YOUR\nCHECKLIST', 110, pal, max_size=86)
+
+    card_x0 = canvas.MARGIN
+    card_x1 = canvas.PIN_W - canvas.MARGIN
+    card_y0 = y + 50
+    card_y1 = canvas.PIN_H - canvas.MARGIN - 90
+
     d = ImageDraw.Draw(img)
-    for b in rec['bullets'][:5]:
-        wrapped = canvas.wrap_lines(b, inner, 28)
+    d.rounded_rectangle([card_x0, card_y0, card_x1, card_y1], radius=28,
+                        fill=_card_fill(pal), outline=pal.muted, width=2)
+
+    pad = 36
+    tick = 36
+    size = 27
+    inner = (card_x1 - card_x0) - pad * 2 - tick - 24
+    bullets = rec['bullets'][:5]
+    items = []
+    for b in bullets:
+        wrapped = canvas.wrap_lines(b, inner, size)
         lines = wrapped[:2]
         if len(wrapped) > 2:
-            lines[-1] = _ellipsize(lines[-1], inner, 28)
-        d.rounded_rectangle(
-            [canvas.MARGIN, y + 6, canvas.MARGIN + tick, y + 6 + tick],
-            radius=6, fill=pal.spine_front)
-        y = canvas.draw_block(img, canvas.MARGIN + tick + 30, y, lines, 28,
-                              pal.title)
-        y += 22
-        if y > canvas.PIN_H - canvas.MARGIN - 90:
-            break
+            lines[-1] = _ellipsize(lines[-1], inner, size)
+        items.append(lines)
+
+    n = max(len(items), 1)
+    inner_top = card_y0 + pad
+    inner_bottom = card_y1 - pad
+    slot = (inner_bottom - inner_top) // n
+    box_x = card_x0 + pad
+    text_x = box_x + tick + 24
+    yy = inner_top
+    for lines in items:
+        d.rounded_rectangle([box_x, yy + 2, box_x + tick, yy + 2 + tick],
+                            radius=8, outline=pal.spine_front, width=4)
+        canvas.draw_block(img, text_x, yy, lines, size, pal.title, leading=1.34)
+        yy += slot
+
     canvas.footer(img, pal)
     return img
 
@@ -148,45 +209,82 @@ def _comparison(sku, pal):
     col_w = (inner - gutter) // 2
     wrapped_rows = []
     for left, right in rows:
-        left_lines = canvas.wrap_lines(left, col_w, 34)
-        right_lines = canvas.wrap_lines(right, col_w, 34)
+        left_lines = canvas.wrap_lines(left, col_w, 40)
+        right_lines = canvas.wrap_lines(right, col_w, 40)
         if len(left_lines) > 2 or len(right_lines) > 2:
             return None
         wrapped_rows.append((left_lines, right_lines))
 
     img = canvas.new_pin(pal)
-    y = canvas.fitted_heading(img, heading, 130, pal, max_size=64)
-    y += 60
+    y = canvas.fitted_heading(img, heading, 150, pal, max_size=64)
+
+    # Space-between, not evenly-sliced-and-left-top-anchored: a fixed number
+    # of even slots starting from the top leaves a large trailing gap after
+    # the LAST row whenever there are few rows (3 rows x a big slot each
+    # leaves most of that slot blank under the last one). Instead the gap
+    # BETWEEN rows is computed from the actual text height and row count so
+    # the last row's own text always ends at `bottom`, whether there are 3
+    # rows or 6.
+    row_h = int(40 * 1.34)
+    top = y + 70
+    bottom = canvas.PIN_H - canvas.MARGIN - 110
+    n = len(wrapped_rows)
+    total_text = n * row_h
+    gap = (bottom - top - total_text) / max(n - 1, 1) if n > 1 else 0
+
     d = ImageDraw.Draw(img)
-    for left_lines, right_lines in wrapped_rows:
-        end_left = canvas.draw_block(img, canvas.MARGIN, y, left_lines, 34,
-                                     pal.title)
-        end_right = _draw_right_aligned(img, canvas.PIN_W - canvas.MARGIN, y,
-                                        right_lines, 34, pal.spine_front)
-        row_bottom = max(end_left, end_right)
-        rule_y = row_bottom + 6
-        d.line([(canvas.MARGIN, rule_y), (canvas.PIN_W - canvas.MARGIN, rule_y)],
-              fill=pal.muted, width=1)
-        y = rule_y + 24
-        if y > canvas.PIN_H - canvas.MARGIN - 90:
-            break
+    yy = float(top)
+    for i, (left_lines, right_lines) in enumerate(wrapped_rows):
+        iy = int(yy)
+        canvas.draw_block(img, canvas.MARGIN, iy, left_lines, 40, pal.title,
+                          leading=1.34)
+        _draw_right_aligned(img, canvas.PIN_W - canvas.MARGIN, iy, right_lines,
+                            40, pal.spine_front, leading=1.34)
+        if i < n - 1:
+            rule_y = iy + row_h + int(gap / 2)
+            d.line([(canvas.MARGIN, rule_y), (canvas.PIN_W - canvas.MARGIN, rule_y)],
+                  fill=pal.muted, width=2)
+        yy += row_h + gap
     canvas.footer(img, pal)
     return img
 
 
 def _tip(sku, pal):
+    """A quote card: one sentence, set large, wrapped across the middle of
+    the canvas and centred within a band that is itself biased toward the
+    lower two-thirds -- a short tip still has to reach past 70% of the
+    canvas, not just sit wherever a true geometric centre would put it.
+    """
     text = pc.TIPS.get(sku)
     if not text:
         return None
     inner = canvas.PIN_W - canvas.MARGIN * 2
-    if not canvas.fits(text.split()[0], inner, 36):
+    if not canvas.fits(text.split()[0], inner, 40):
         return None
+
+    size = 60
+    lines = canvas.wrap_lines(text, inner, size)
+    while size > 34 and len(lines) > 7:
+        size -= 4
+        lines = canvas.wrap_lines(text, inner, size)
+
+    leading = 1.42
+    block_h = len(lines) * int(size * leading)
+
     img = canvas.new_pin(pal)
-    canvas.draw_block(img, canvas.MARGIN, canvas.PIN_H // 3 - 80, ['TIP'], 26,
-                      pal.spine_front)
-    lines = canvas.wrap_lines(text, inner, 36)
-    canvas.draw_block(img, canvas.MARGIN, canvas.PIN_H // 3, lines, 36,
-                      pal.title)
+    canvas.draw_block(img, canvas.MARGIN, 150, ['TIP'], 28, pal.spine_front)
+
+    band_top, band_bottom = 620, 1350
+    band = band_bottom - band_top
+    y = band_top + max(0, (band - block_h) // 2)
+    canvas.draw_block(img, canvas.MARGIN, y, lines, size, pal.title,
+                      leading=leading)
+
+    d = ImageDraw.Draw(img)
+    rule_y = min(y + block_h + 50, canvas.PIN_H - canvas.MARGIN - 130)
+    d.line([(canvas.MARGIN, rule_y), (canvas.MARGIN + 90, rule_y)],
+          fill=pal.spine_front, width=6)
+
     canvas.footer(img, pal)
     return img
 

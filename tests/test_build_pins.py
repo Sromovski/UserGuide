@@ -50,3 +50,23 @@ def test_write_csv_has_a_header_and_one_row_per_pin(tmp_path, monkeypatch):
     lines = open(path, encoding='utf-8').read().strip().splitlines()
     assert lines[0].startswith('sku,template,file,title,description,url,board')
     assert len(lines) == len(rows) + 1
+
+
+def test_no_canvas_template_leaves_the_bottom_half_empty():
+    # A 2:3 pin exists for its vertical space. Anything that stacks content in
+    # the top third reads as unfinished in a feed. `product` is exempt: it is
+    # the approved cover art, rendered by covers/.
+    from covers import palette
+    from pins import copy as pc, templates, canvas
+    thin = []
+    for name, fn in templates.TEMPLATES.items():
+        if name == 'product':
+            continue
+        for sku in pc.SKUS:
+            img = fn(sku, palette.get(pc.palette_key_for(sku)))
+            if img is None:
+                continue
+            e = canvas.content_extent(img, palette.get(pc.palette_key_for(sku)))
+            if e < 0.70:
+                thin.append('%s/%s -> %.2f' % (name, sku, e))
+    assert thin == [], '\n'.join(thin)

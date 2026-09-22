@@ -1,14 +1,34 @@
 """Pin-sized canvas and the drawing helpers every template shares."""
-from PIL import Image, ImageDraw
+from PIL import ImageDraw
 
 from covers import render
 
 PIN_W, PIN_H = 1000, 1500
 MARGIN = 72
 
+_BG_CACHE = {}
+
 
 def new_pin(pal):
     return render.gradient((PIN_W, PIN_H), pal.grad).convert('RGB')
+
+
+def _bg_for(pal):
+    """The rendered background for `pal`, cached per palette key.
+
+    overflows(), content_extent() and footer_collision() each re-rendered a
+    full 1000x1500 gradient on every single call just to diff it pixel-by-
+    pixel against the image under test -- that repeated render was most of
+    the test suite's runtime. new_pin() itself is untouched, so templates
+    that draw on top of their canvas still always get a fresh image; only
+    these read-only comparisons share one render per palette key. Returns a
+    copy so a caller cannot mutate the cached master.
+    """
+    bg = _BG_CACHE.get(pal.key)
+    if bg is None:
+        bg = new_pin(pal)
+        _BG_CACHE[pal.key] = bg
+    return bg.copy()
 
 
 def wrap_lines(text, max_w, size, bold=True):
@@ -78,7 +98,7 @@ def content_extent(img, pal):
     the vertical space is the format's advantage; leaving the bottom half empty
     throws that away.
     """
-    bg = new_pin(pal).convert('RGB').load()
+    bg = _bg_for(pal).load()
     px = img.convert('RGB').load()
     lowest = 0
     for y in range(0, PIN_H - MARGIN - 40, 4):
@@ -100,12 +120,15 @@ def overflows(img, pal):
     centred heading defeats, because it overflows both sides by the same amount
     in the same colour and ink got compared to ink).
 
-    band is MARGIN - 4, not MARGIN: covers' own portrait layout pads to 70px and
-    glyph antialiasing bleeds a pixel or two left of the pen position, so a
-    band of exactly MARGIN false-positives on the product template. 4px of
-    slack is far less than any real overflow.
+    band is MARGIN - 4, not MARGIN. The slack is on the RIGHT, not the left:
+    measured across all nine product renders, the closest ink to either edge
+    is x=74 on the left (already inside MARGIN=72, no slack needed there) but
+    x=929 on the right, 1px past PIN_W - MARGIN = 928, which a band of exactly
+    MARGIN false-positives on the product template. Do not tighten this back
+    toward MARGIN on the strength of the left side -- it is the right side
+    that is load-bearing.
     """
-    bg = new_pin(pal).convert('RGB').load()
+    bg = _bg_for(pal).load()
     px = img.convert('RGB').load()
     band = MARGIN - 4
     for y in range(0, PIN_H, 4):
@@ -127,7 +150,7 @@ def footer_collision(img, pal):
 
     Call this BEFORE footer() is drawn, or the footer itself trips it.
     """
-    bg = new_pin(pal).convert('RGB').load()
+    bg = _bg_for(pal).load()
     px = img.convert('RGB').load()
     for y in range(PIN_H - MARGIN - 40, PIN_H):
         for x in range(0, PIN_W, 2):

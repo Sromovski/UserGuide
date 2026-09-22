@@ -83,9 +83,9 @@ def overflows(img):
     px = img.convert('RGB').load()
     band = MARGIN - 2
     for y in range(0, PIN_H, 4):
-        ref = px[PIN_W // 2, y]
         for x in list(range(band)) + list(range(PIN_W - band, PIN_W)):
             c = px[x, y]
+            ref = px[PIN_W - 1 - x, y]
             if sum(abs(c[i] - ref[i]) for i in range(3)) > 90:
                 return True
     return False

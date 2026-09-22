@@ -36,11 +36,11 @@ def draw_block(img, x, y, lines, size, colour, bold=True, leading=1.30):
     return y
 
 
-def fitted_heading(img, text, y, pal, max_size=96):
+def fitted_heading(img, text, y, pal, max_size=96, floor=18):
     d = ImageDraw.Draw(img)
     inner = PIN_W - MARGIN * 2
     lines = text.split('\n')
-    fnt = render.fit_text(max(lines, key=len), inner, max_size)
+    fnt = render.fit_text(max(lines, key=len), inner, max_size, bold=True, floor=floor)
     for ln in lines:
         d.text(((PIN_W - render._width(ln, fnt)) / 2, y), ln, font=fnt,
                fill=pal.title)
@@ -56,15 +56,32 @@ def footer(img, pal, text='FRANKSMARKETDESIGNS.ETSY.COM'):
            spaced, font=fnt, fill=pal.muted)
 
 
+def fits(text, max_w, start, floor=18, bold=True):
+    """Whether text can be drawn at `start` or smaller without going below `floor`.
+
+    Templates must skip a pin rather than draw clipped text, so they need to ASK
+    before drawing. fit_text answers by raising, which is the wrong shape for a
+    caller that wants to decide.
+    """
+    try:
+        render.fit_text(text, max_w, start, bold=bold, floor=floor)
+        return True
+    except ValueError:
+        return False
+
+
 def overflows(img):
     """True if ink sits inside the margin band.
 
     The background is a gradient, so 'ink' means a pixel that differs markedly
     from the background pixel at the same height on the opposite side of the
     canvas. Cheap, and it catches the failure that matters: text running off.
+    2px of slack, not zero, because text drawn at exactly x=MARGIN antialiases
+    a pixel or so to its left. More slack than that would hide the boundary
+    overflows this guard exists to catch.
     """
     px = img.convert('RGB').load()
-    band = MARGIN - 8
+    band = MARGIN - 2
     for y in range(0, PIN_H, 4):
         ref = px[PIN_W // 2, y]
         for x in list(range(band)) + list(range(PIN_W - band, PIN_W)):

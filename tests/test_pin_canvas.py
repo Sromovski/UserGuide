@@ -37,3 +37,28 @@ def test_overflows_is_true_when_ink_sits_in_the_margin():
     img = canvas.new_pin(palette.get('claude'))
     ImageDraw.Draw(img).rectangle([0, 700, 40, 760], fill=(0, 0, 0))
     assert canvas.overflows(img) is True
+
+
+def test_overflows_catches_ink_just_inside_the_margin():
+    from PIL import ImageDraw
+    img = canvas.new_pin(palette.get('claude'))
+    ImageDraw.Draw(img).rectangle([64, 700, 70, 760], fill=(0, 0, 0))
+    assert canvas.overflows(img) is True
+
+
+def test_fits_returns_true_for_short_text():
+    assert canvas.fits('hi', 500, 96) is True
+
+
+def test_fits_returns_false_for_very_long_text():
+    long_text = 'a very long string that absolutely cannot possibly fit on a single line at all'
+    assert canvas.fits(long_text, 100, 18) is False
+
+
+def test_fitted_heading_raises_when_text_too_long():
+    import pytest
+    img = canvas.new_pin(palette.get('claude'))
+    # Use a text that can't fit in 856px even at size 18 (the floor)
+    long_text = 'a' * 200  # 200 a's in Helvetica Bold won't fit in 856px at size 18
+    with pytest.raises(ValueError):
+        canvas.fitted_heading(img, long_text, 100, palette.get('claude'), max_size=18, floor=18)

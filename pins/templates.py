@@ -231,11 +231,19 @@ def _comparison(sku, pal):
     # BETWEEN rows is computed from the actual text height and row count so
     # the last row's own text always ends at `bottom`, whether there are 3
     # rows or 6.
-    row_h = int(40 * 1.34)
+    #
+    # line_h is a SINGLE line's height. A row's own height is
+    # max(len(left_lines), len(right_lines)) * line_h -- the wrap check above
+    # allows a cell up to 2 lines, so a row can need twice line_h, and
+    # budgeting one line per row here drew 106px into a 53px reservation the
+    # first time a curated comparison had a two-line cell.
+    line_h = int(40 * 1.34)
     top = y + 70
     bottom = canvas.PIN_H - canvas.MARGIN - 110
     n = len(wrapped_rows)
-    total_text = n * row_h
+    row_heights = [max(len(left_lines), len(right_lines)) * line_h
+                  for left_lines, right_lines in wrapped_rows]
+    total_text = sum(row_heights)
     gap = (bottom - top - total_text) / max(n - 1, 1) if n > 1 else 0
 
     d = ImageDraw.Draw(img)
@@ -246,6 +254,7 @@ def _comparison(sku, pal):
                           leading=1.34)
         _draw_right_aligned(img, canvas.PIN_W - canvas.MARGIN, iy, right_lines,
                             40, pal.spine_front, leading=1.34)
+        row_h = row_heights[i]
         if i < n - 1:
             rule_y = iy + row_h + int(gap / 2)
             d.line([(canvas.MARGIN, rule_y), (canvas.PIN_W - canvas.MARGIN, rule_y)],

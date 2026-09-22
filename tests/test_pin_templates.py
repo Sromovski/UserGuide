@@ -43,6 +43,27 @@ def test_no_template_paints_into_the_margin():
     assert offenders == []
 
 
+def test_comparison_budgets_two_line_rows_not_one(monkeypatch):
+    # row_h used to be a single line's height even though the wrap check above
+    # it allows two-line cells -- six two-line rows drew 106px per row into a
+    # 53px reservation, so the block's own text ran to y~1371 against the
+    # `bottom` budget of PIN_H - MARGIN - 110 = 1318 the code's own comment
+    # promises ("the last row's own text always ends at `bottom`"). Force
+    # every cell onto two lines and check that promise actually holds, with
+    # slack only for glyph descenders -- not the finished pin, which always
+    # trips footer_collision because footer() has by then stamped ink into
+    # that same band.
+    sku = '02-starter-volume'
+    two_line_row = ('Limited usage available today', 'Limited usage available today')
+    monkeypatch.setitem(pc.COMPARISONS, sku, [two_line_row] * 6)
+    pal = palette.get(pc.palette_key_for(sku))
+    img = templates.TEMPLATES['comparison'](sku, pal)
+    assert img is not None
+    assert canvas.overflows(img, pal) is False
+    bottom_budget = (canvas.PIN_H - canvas.MARGIN - 110) / float(canvas.PIN_H)
+    assert canvas.content_extent(img, pal) <= bottom_budget + 0.01
+
+
 def test_no_pin_is_a_flat_fill():
     offenders = []
     for name, fn in templates.TEMPLATES.items():

@@ -489,6 +489,57 @@ Part of the Claude AI Field Guide Series — 20 guides covering every way to use
 
 ## NOTES & DECISIONS LOG
 
+- 2026-09-22: **PINTEREST PIN FACTORY — `pins/` package, 48 pins, `build_pins.py`.**
+  Distribution work, not more catalogue. Pinterest rewards FRESH PINS, not new
+  products, so one image per product is about a week of posting. Six templates x nine
+  consumer-fit SKUs turns pin production from a writing problem into a template one.
+  `pins/canvas.py` (pin-sized canvas + shared drawing) · `pins/copy.py` (titles,
+  descriptions, boards, hooks, tips, comparisons, URL resolution) · `pins/templates.py`
+  (product · listicle · hook · checklist · comparison · tip) · `build_pins.py` ->
+  `outputs/pins/<sku>/<template>.png` + `PINS.csv`. Built on `covers/`, so a pin
+  inherits its series palette. 167 tests. Spec + plan in `docs/superpowers/`.
+  - **Scoped to NINE consumer-fit SKUs** (40-chatgpt-v1, 02, 01, 10, 11, 12, 03, 20, 30).
+    The deep developer volumes are excluded: their audience is not on Pinterest, and
+    low-engagement pins drag a young account's signal when it matters most.
+  - 48 render, 6 skip. **A template that cannot render returns None and the build says
+    so** — `comparison` skips the six SKUs with no curated rows. Padding it with the
+    SKU's `included` list (a file manifest) is explicitly forbidden.
+  - **One title per product, reused across its pins.** Inventing six per-template
+    variants is where fabricated claims creep in. Titles/descriptions are byte-identical
+    to `outputs/pins/PINS_wave1.csv`, which is already live on Pinterest.
+  - Posting is MANUAL — no Pinterest API, no credentials in this project.
+
+  **`canvas.overflows()` WAS WRONG THREE TIMES. Read this before touching a guard.**
+  It stops a pin shipping with clipped text, and each wrong version passed review:
+  1. Compared margin pixels to the canvas CENTRE — but the centre is CONTENT, so any
+     centred pin false-positived. Survived because every test drew on an EMPTY pin.
+  2. Compared to the MIRRORED opposite margin — defeated by centred text, which
+     overflows both sides by the same amount in the same colour, so ink was compared
+     to ink. Reproduced with two rectangles at x 0-40 and x 959-999.
+  3. Correct: compare against a FRESHLY RENDERED background. Deterministic, and no
+     symmetry can game it. **It assumes every template paints the standard gradient** —
+     a future full-bleed template would make the whole canvas read as overflow.
+  **And the real hole was an axis nobody checked:** both guards looked sideways only.
+  Text at y=1420 (straight over the footer) or y=1480 (off the canvas) passed clean.
+  `footer_collision()` closes it. `audit_pdfs.py` has had the equivalent footer-bar
+  check for the PDFs since the same bug shipped there. **Three properties matter:
+  containment, reach, collision.** A guard that checks two of three looks green.
+  - `content_extent()` requires content to reach >= 0.70 down the canvas. Proved
+    non-vacuous by measuring the PRE-FIX templates: 0.30-0.54, all under the floor.
+    `product` is exempt — it renders the approved cover art via `covers/`.
+  - **`make_contact_sheet.py` is committed and should be run before a posting batch.**
+    The guards prove a pin is contained and full; only eyes tell you it is worth
+    pinning. A human looking at rendered pins is what caught BOTH real design defects
+    on this branch — half-empty canvases, and `checklist` being `listicle` with a
+    different glyph — neither of which any passing test could see.
+  - **FIXED IN `covers/palette.py`: grok had `title` and `spine_front` IDENTICAL**
+    `(11,13,16)`. Every accent — listicle numerals, checklist ticks, the comparison's
+    whole right column, the TIP label — would have rendered as body text the moment
+    the Grok series started. A test now asserts `title != spine_front` for all five.
+  - `url_for` gates on Etsy `state == 'active'` and Gumroad `published`. **Etsy
+    listings expire after four months**, so this is a decaying guarantee — rebuild
+    before a posting batch rather than trusting an old CSV.
+
 - 2026-09-20: **ETSY FULLY REPUBLISHED — 21 products, new covers, matching PDFs.**
   `--update-images` pushed 5 images to all 20 existing listings (20 ok / 0 failed), then
   `--update-files` pushed the rebuilt PDFs (20 ok / 1 benign fail). **ChatGPT Volume 1 is

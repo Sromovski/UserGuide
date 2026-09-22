@@ -45,6 +45,44 @@ def test_url_raises_when_a_sku_resolves_nowhere(monkeypatch):
         pc.url_for('02-starter-volume')
 
 
+def test_etsy_url_is_empty_unless_the_row_is_active(monkeypatch):
+    # Etsy listings expire after four months and --status writes that back to
+    # the db, so a row can carry a stale `url` for a listing that is no
+    # longer live. Only state == 'active' means it is actually there.
+    monkeypatch.setattr(pc, '_edb',
+                        type('M', (), {'get': staticmethod(
+                            lambda s: {'url': 'https://etsy/x', 'state': 'expired'})})())
+    assert pc._etsy_url('02-starter-volume') == ''
+
+
+def test_gumroad_url_is_empty_unless_published(monkeypatch):
+    monkeypatch.setattr(pc, '_gp',
+                        type('M', (), {'get': staticmethod(
+                            lambda s: {'url': 'https://gumroad/x', 'published': 0})})())
+    assert pc._gumroad_url('02-starter-volume') == ''
+
+
+def test_url_for_falls_through_an_inactive_etsy_row_to_gumroad(monkeypatch):
+    monkeypatch.setattr(pc, '_edb',
+                        type('M', (), {'get': staticmethod(
+                            lambda s: {'url': 'https://etsy/dead', 'state': 'expired'})})())
+    monkeypatch.setattr(pc, '_gp',
+                        type('M', (), {'get': staticmethod(
+                            lambda s: {'url': 'https://gumroad/live', 'published': 1})})())
+    assert pc.url_for('02-starter-volume') == 'https://gumroad/live'
+
+
+def test_url_for_raises_when_both_channels_are_dead(monkeypatch):
+    monkeypatch.setattr(pc, '_edb',
+                        type('M', (), {'get': staticmethod(
+                            lambda s: {'url': 'https://etsy/dead', 'state': 'expired'})})())
+    monkeypatch.setattr(pc, '_gp',
+                        type('M', (), {'get': staticmethod(
+                            lambda s: {'url': 'https://gumroad/dead', 'published': 0})})())
+    with pytest.raises(KeyError, match='02-starter-volume'):
+        pc.url_for('02-starter-volume')
+
+
 def test_every_live_sku_resolves_to_a_real_url():
     dead = []
     for s in pc.SKUS:

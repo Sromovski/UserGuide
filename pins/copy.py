@@ -166,13 +166,25 @@ def sku_record(sku):
 
 
 def _etsy_url(sku):
-    r = _edb.get(sku)
-    return (r or {}).get('url') or ''
+    """The listing's URL, but only once the local db records it as live.
+
+    Etsy listings expire after four months and `--status` writes the
+    resulting state back to the db, so an existing row's `url` column can
+    outlive the listing it points at. Only `state == 'active'` means the
+    listing is actually there.
+    """
+    r = _edb.get(sku) or {}
+    if r.get('state') != 'active':
+        return ''
+    return r.get('url') or ''
 
 
 def _gumroad_url(sku):
-    r = _gp.get(sku)
-    return (r or {}).get('url') or ''
+    """The product's URL, but only once the local db records it as published."""
+    r = _gp.get(sku) or {}
+    if not r.get('published'):
+        return ''
+    return r.get('url') or ''
 
 
 def url_for(sku):

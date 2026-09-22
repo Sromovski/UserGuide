@@ -50,6 +50,17 @@ def _ellipsize(line, max_w, size):
     return text
 
 
+def _draw_right_aligned(img, right_x, y, lines, size, colour, leading=1.30):
+    """Like canvas.draw_block, but each line's right edge lands at `right_x`."""
+    d = ImageDraw.Draw(img)
+    fnt = render.font(size, True)
+    for ln in lines:
+        w = render._width(ln, fnt)
+        d.text((right_x - w, y), ln, font=fnt, fill=colour)
+        y += int(size * leading)
+    return y
+
+
 def _product(sku, pal):
     return render.render(catalogue.spec_for(pc.sku_record(sku)), 'pin')
 
@@ -126,21 +137,37 @@ def _comparison(sku, pal):
     heading = rec['headline'].replace('\n', ' ')
     if not canvas.fits(heading, inner, 64):
         return None
+
+    # Each cell gets half the inner width minus a gutter between columns, and
+    # is wrapped -- 'Agent mode' / 'Uses credits' / 'Limited usage' are all
+    # multi-word and unwrapped text can overlap mid-canvas, which the
+    # margin-only overflow guard cannot see. A cell that still needs more
+    # than 2 lines at that width means the row cannot be drawn without
+    # overlap, so the whole pin is skipped rather than risking that overlap.
+    gutter = 40
+    col_w = (inner - gutter) // 2
+    wrapped_rows = []
+    for left, right in rows:
+        left_lines = canvas.wrap_lines(left, col_w, 34)
+        right_lines = canvas.wrap_lines(right, col_w, 34)
+        if len(left_lines) > 2 or len(right_lines) > 2:
+            return None
+        wrapped_rows.append((left_lines, right_lines))
+
     img = canvas.new_pin(pal)
     y = canvas.fitted_heading(img, heading, 130, pal, max_size=64)
     y += 60
     d = ImageDraw.Draw(img)
-    row_h = 90
-    for left, right in rows:
-        canvas.draw_block(img, canvas.MARGIN, y, [left], 34, pal.title)
-        rfnt = render.font(34, True)
-        rw = render._width(right, rfnt)
-        canvas.draw_block(img, canvas.PIN_W - canvas.MARGIN - rw, y, [right],
-                          34, pal.spine_front)
-        rule_y = y + row_h - 24
+    for left_lines, right_lines in wrapped_rows:
+        end_left = canvas.draw_block(img, canvas.MARGIN, y, left_lines, 34,
+                                     pal.title)
+        end_right = _draw_right_aligned(img, canvas.PIN_W - canvas.MARGIN, y,
+                                        right_lines, 34, pal.spine_front)
+        row_bottom = max(end_left, end_right)
+        rule_y = row_bottom + 6
         d.line([(canvas.MARGIN, rule_y), (canvas.PIN_W - canvas.MARGIN, rule_y)],
               fill=pal.muted, width=1)
-        y += row_h
+        y = rule_y + 24
         if y > canvas.PIN_H - canvas.MARGIN - 90:
             break
     canvas.footer(img, pal)
